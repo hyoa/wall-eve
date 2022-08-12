@@ -36,9 +36,8 @@ func getNbPages(url string) int {
 
 func getOrdersForRegion(r int) ([]domain.RawOrder, error) {
 	o := make([]domain.RawOrder, 0)
-	// headUrl := fmt.Sprintf("https://esi.evetech.net/latest/markets/%d/orders/?datasource=tranquility&order_type=all&page=1", r)
-	// nbPages := getNbPages(headUrl)
-	nbPages := 1
+	headUrl := fmt.Sprintf("https://esi.evetech.net/latest/markets/%d/orders/?datasource=tranquility&order_type=all&page=1", r)
+	nbPages := getNbPages(headUrl)
 
 	c := make(chan chanFetchOrders)
 

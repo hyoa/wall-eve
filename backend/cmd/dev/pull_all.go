@@ -18,7 +18,7 @@ func main() {
 
 	orderUseCase := domain.NewOrderUseCase(&externalOrderRepo, orderRepo)
 
-	orderUseCase.FetchAllOrdersForRegion(10000002)
+	orderUseCase.FetchAllOrdersForRegion(10000032)
 
 	defer func() {
 		if err := client.Close(); err != nil {
