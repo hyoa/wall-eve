@@ -141,6 +141,45 @@ func (r *RedisRepository) DeleteAllOrdersForRegion(regionId int32) error {
 	return nil
 }
 
+func (r *RedisRepository) DeleteAllOrdersForRegionAndTypeId(regionId, typeId int32) error {
+	ctx := context.Background()
+	log.Infoln("Scanning keys for deletion: ", regionId, typeId)
+	iter := r.client.Scan(ctx, 0, fmt.Sprintf("orders:%d:*", regionId), 0).Iterator()
+
+	log.Infoln("Prepare deletion")
+	pool, _ := ants.NewPoolWithFunc(100, taskDeleteOrderFunc, ants.WithPanicHandler(panicHandler))
+	defer pool.Release()
+
+	var wg sync.WaitGroup
+	tasks := make([]*taskDeleteOrderStruct, 0)
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+
+		if strings.Contains(key, fmt.Sprintf("%d", typeId)) {
+			task := &taskDeleteOrderStruct{
+				wg:     &wg,
+				client: r.client,
+				key:    key,
+			}
+
+			wg.Add(1)
+			tasks = append(tasks, task)
+			pool.Invoke(task)
+		}
+
+	}
+
+	if err := iter.Err(); err != nil {
+		panic(err)
+	}
+
+	log.Infoln("Wait for deletion completion")
+	wg.Wait()
+
+	return nil
+}
+
 func (r *RedisRepository) AggregateOrdersForRegionAndTypeId(regionId, typeId int32) ([]domain.DenormalizedOrder, error) {
 	val, err := r.client.Do(
 		context.Background(),

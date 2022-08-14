@@ -65,6 +65,7 @@ type ExternalOrdersRepository interface {
 type OrdersRepository interface {
 	SaveOrders([]Order) error
 	DeleteAllOrdersForRegion(regionId int32) error
+	DeleteAllOrdersForRegionAndTypeId(regionId, typeId int32) error
 	AggregateOrdersForRegionAndTypeId(regionId int32, typeId int32) ([]DenormalizedOrder, error)
 	SaveDenormalizedOrders([]DenormalizedOrder) error
 	SearchDenormalizedOrders(filter Filter) ([]DenormalizedOrder, error)
@@ -154,6 +155,7 @@ func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) e
 	}
 
 	ouc.ordersRepository.SaveDenormalizedOrders(orders)
+	ouc.ordersRepository.DeleteAllOrdersForRegionAndTypeId(regionId, typeId)
 
 	return nil
 }
