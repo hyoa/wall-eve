@@ -8,6 +8,7 @@ import (
 type OrderUseCase struct {
 	externalOrderRepository ExternalOrdersRepository
 	ordersRepository        OrdersRepository
+	externalDataRepository  ExternalDataRepository
 }
 
 type RawOrder struct {
@@ -35,6 +36,28 @@ type Order struct {
 	IssuedAt     int64   `json:"issuedAt"`
 }
 
+type DenormalizedOrder struct {
+	RegionId     int32
+	SystemId     int32
+	LocationId   int32
+	TypeId       int32
+	RegionName   string
+	SystemName   string
+	LocationName string
+	TypeName     string
+	BuyPrice     float64
+	SellPrice    float64
+	BuyVolume    int32
+	SellVolume   int32
+}
+
+type ExternalDataRepository interface {
+	FetchTypeName(typeId int32) string
+	FetchRegionName(regionId int32) string
+	FetchSystemName(systemId int32) string
+	FetchLocationName(LocationId int32) string
+}
+
 type ExternalOrdersRepository interface {
 	FetchOrders(regionId int32) ([]RawOrder, error)
 }
@@ -42,12 +65,15 @@ type ExternalOrdersRepository interface {
 type OrdersRepository interface {
 	SaveOrders([]Order) error
 	DeleteAllOrdersForRegion(regionId int32) error
+	AggregateOrdersForRegionAndTypeId(regionId int32, typeId int32) ([]DenormalizedOrder, error)
+	SaveDenormalizedOrders([]DenormalizedOrder) error
 }
 
-func NewOrderUseCase(externalOrderRepository ExternalOrdersRepository, ordersRepository OrdersRepository) OrderUseCase {
+func NewOrderUseCase(externalOrderRepository ExternalOrdersRepository, ordersRepository OrdersRepository, externalDataRepository ExternalDataRepository) OrderUseCase {
 	return OrderUseCase{
 		externalOrderRepository: externalOrderRepository,
 		ordersRepository:        ordersRepository,
+		externalDataRepository:  externalDataRepository,
 	}
 }
 
@@ -85,6 +111,25 @@ func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
 	if errSave != nil {
 		return fmt.Errorf("Unable to save orders for %d: %w", regionId, errFetch)
 	}
+
+	return nil
+}
+
+func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) error {
+	orders, errAggregate := ouc.ordersRepository.AggregateOrdersForRegionAndTypeId(regionId, typeId)
+
+	if errAggregate != nil {
+		return fmt.Errorf("Unable to aggregate orders: %w", errAggregate)
+	}
+
+	for k := range orders {
+		orders[k].LocationName = ouc.externalDataRepository.FetchLocationName(orders[k].LocationId)
+		orders[k].RegionName = ouc.externalDataRepository.FetchRegionName(orders[k].RegionId)
+		// orders[k].SystemName = ouc.externalDataRepository.FetchSystemName(typeId)
+		orders[k].TypeName = ouc.externalDataRepository.FetchTypeName(orders[k].TypeId)
+	}
+
+	ouc.ordersRepository.SaveDenormalizedOrders(orders)
 
 	return nil
 }

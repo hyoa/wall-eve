@@ -22,6 +22,30 @@ func (er *EsiRepository) FetchOrders(regionId int32) ([]domain.RawOrder, error) 
 	return getOrdersForRegion(int(regionId))
 }
 
+type UniverseElementName struct {
+	Name string `json:"name"`
+}
+
+func (er *EsiRepository) FetchElementName(typeId int32, kind string) string {
+	url := fmt.Sprintf("https://esi.evetech.net/latest/universe/%s/%d/?datasource=tranquility&language=en", kind, typeId)
+	resp, errGet := http.Get(url)
+
+	if errGet != nil {
+		fmt.Printf("Unable to fetch for url %s", url)
+	}
+
+	b, errBody := ioutil.ReadAll(resp.Body)
+
+	if errBody != nil {
+		fmt.Printf("Unable to fetch for url %s", url)
+	}
+
+	var item UniverseElementName
+	json.Unmarshal(b, &item)
+
+	return item.Name
+}
+
 func getNbPages(url string) int {
 	resp, err := http.Head(url)
 
