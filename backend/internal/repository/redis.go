@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -227,6 +228,78 @@ func (r *RedisRepository) SaveDenormalizedOrders(orders []domain.DenormalizedOrd
 	return nil
 }
 
+func (r *RedisRepository) SearchDenormalizedOrders(filter domain.Filter) ([]domain.DenormalizedOrder, error) {
+	searchParams := createSearchParams(filter)
+	queryParams := fmt.Sprintf(
+		"%s @buyPrice:[%.2f %.2f] @sellPrice:[%.2f %.2f]",
+		searchParams,
+		filter.MinBuyPrice,
+		filter.MaxBuyPrice,
+		filter.MinSellPrice,
+		filter.MaxSellPrice,
+	)
+
+	val, err := r.client.Do(
+		context.Background(),
+		"FT.SEARCH", "denormalizedOrdersIdx",
+		queryParams,
+	).Result()
+
+	if err != nil {
+		return make([]domain.DenormalizedOrder, 0), err
+	}
+
+	ordersParsed := parseSearchOrders(val)
+
+	denormalizedOrders := make([]domain.DenormalizedOrder, 0)
+	for k := range ordersParsed {
+		denormalizedOrders = append(denormalizedOrders, domain.DenormalizedOrder{
+			RegionId:     ordersParsed[k].RegionId,
+			SystemId:     ordersParsed[k].SystemId,
+			LocationId:   ordersParsed[k].LocationId,
+			TypeId:       ordersParsed[k].TypeId,
+			RegionName:   ordersParsed[k].RegionName,
+			SystemName:   ordersParsed[k].SystemName,
+			LocationName: ordersParsed[k].LocationName,
+			TypeName:     ordersParsed[k].TypeName,
+			BuyPrice:     ordersParsed[k].BuyPrice,
+			SellPrice:    ordersParsed[k].SellPrice,
+		})
+	}
+
+	return denormalizedOrders, nil
+}
+
+func createSearchParams(filter domain.Filter) string {
+	searchParamsArray := make([]string, 0)
+
+	if filter.LocationId != 0 {
+		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@locationId:[%d %d]", filter.LocationId, filter.LocationId))
+	}
+
+	if filter.RegionId != 0 {
+		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@regionId:[%d %d]", filter.RegionId, filter.RegionId))
+	}
+
+	if filter.SystemId != 0 {
+		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@systemId:[%d %d]", filter.SystemId, filter.SystemId))
+	}
+
+	if filter.LocationName != "" {
+		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@locationName:(%s)", filter.LocationName))
+	}
+
+	if filter.SystemName != "" {
+		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@systemName:(%s)", filter.SystemName))
+	}
+
+	if filter.RegionName != "" {
+		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@regionName:(%s)", filter.RegionName))
+	}
+
+	return strings.Join(searchParamsArray, " ")
+}
+
 func (r *RedisRepository) Get(key string) (string, bool) {
 	val, errGet := r.client.Get(context.Background(), key).Result()
 
@@ -374,4 +447,39 @@ func parseFormattedArray(data []interface{}) string {
 	}
 
 	return strings.Join(elements, ",")
+}
+
+func parseSearchOrders(data interface{}) []DenormalizedOrderRedis {
+	orders := make([]DenormalizedOrderRedis, 0)
+
+	elements := make([]interface{}, 0)
+
+	// Remove counter
+	switch val := data.(type) {
+	case []interface{}:
+		for i := 1; i < len(val); i++ {
+			elements = append(elements, val[i])
+		}
+	default:
+		panic("Wrong element")
+	}
+
+	fmt.Println("-------")
+	for k := range elements {
+		switch val := elements[k].(type) {
+		case []interface{}:
+			for k2 := range val {
+				switch val2 := val[k2].(type) {
+				case string:
+					if val2 != "$" {
+						var denormalizedOrderRedis DenormalizedOrderRedis
+						json.Unmarshal([]byte(val2), &denormalizedOrderRedis)
+						orders = append(orders, denormalizedOrderRedis)
+					}
+				}
+			}
+		}
+	}
+
+	return orders
 }
