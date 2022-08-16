@@ -45,7 +45,7 @@ type OrdersRedis struct {
 type DenormalizedOrderRedis struct {
 	RegionId     int32   `json:"regionId"`
 	SystemId     int32   `json:"systemId"`
-	LocationId   int32   `json:"locationId"`
+	LocationId   int64   `json:"locationId"`
 	TypeId       int32   `json:"typeId"`
 	RegionName   string  `json:"regionName"`
 	SystemName   string  `json:"systemName"`
@@ -58,8 +58,9 @@ type DenormalizedOrderRedis struct {
 }
 
 type OrdersAggregatedRedis struct {
-	regionId, locationId, typeId int32
-	price, volume                string
+	regionId, typeId int32
+	locationId       int64
+	price, volume    string
 }
 
 type chanSaveOrders struct {
@@ -250,17 +251,10 @@ func (r *RedisRepository) SaveDenormalizedOrders(orders []domain.DenormalizedOrd
 			SellPrice:    orders[k].SellPrice,
 		}
 
-		res, errSet := rh.JSONSet(fmt.Sprintf("denormalizedOrders:%d:%d", formattedDenormalizedOrder.LocationId, formattedDenormalizedOrder.TypeId), ".", formattedDenormalizedOrder)
+		_, errSet := rh.JSONSet(fmt.Sprintf("denormalizedOrders:%d:%d", formattedDenormalizedOrder.LocationId, formattedDenormalizedOrder.TypeId), ".", formattedDenormalizedOrder)
 
 		if errSet != nil {
 			fmt.Println(errSet)
-		}
-
-		if res.(string) == "OK" {
-			fmt.Println("OK")
-
-		} else {
-			fmt.Println("PAS OK")
 		}
 	}
 
@@ -282,6 +276,7 @@ func (r *RedisRepository) SearchDenormalizedOrders(filter domain.Filter) ([]doma
 		context.Background(),
 		"FT.SEARCH", "denormalizedOrdersIdx",
 		queryParams,
+		"LIMIT", 0, 10000,
 	).Result()
 
 	if err != nil {
@@ -401,14 +396,27 @@ func (r *RedisRepository) RemoveOrdersNotInPool(ordersKeys map[domain.KeyOrder][
 	return nil
 }
 
-func (r *RedisRepository) NotifyReadyToIndex(regionId, typeId int32) error {
-	args := goredis.XAddArgs{
-		Stream: "indexation",
-		Values: []interface{}{"regionId", regionId, "typeId", typeId},
-	}
-	res, _ := r.client.XAdd(context.Background(), &args).Result()
-	fmt.Println(res)
+func (r *RedisRepository) NotifyReadyToIndex(regionId int32, typeIds map[int32]bool) error {
+	pool, _ := ants.NewPoolWithFunc(1000, taskNotifyIndexationFunc, ants.WithPanicHandler(panicHandler))
+	defer pool.Release()
 
+	var wg sync.WaitGroup
+	tasks := make([]*taskNotifyIndexationStruct, 0)
+
+	for typeId := range typeIds {
+		task := &taskNotifyIndexationStruct{
+			wg:       &wg,
+			client:   r.client,
+			typeId:   typeId,
+			regionId: regionId,
+		}
+
+		wg.Add(1)
+		tasks = append(tasks, task)
+		pool.Invoke(task)
+	}
+
+	wg.Wait()
 	return nil
 }
 
@@ -539,7 +547,7 @@ func parseAggregateOrders(data interface{}) []OrdersAggregatedRedis {
 
 					if k == 5 {
 						v, _ := strconv.Atoi(val2)
-						order.locationId = int32(v)
+						order.locationId = int64(v)
 					}
 				case []interface{}:
 					if k == 7 {
@@ -624,5 +632,26 @@ func (t *taskSaveOrdersKeysStruct) saveKeys() {
 		t.client.SAdd(context.Background(), keyToSave, id).Result()
 	}
 
+	t.wg.Done()
+}
+
+type taskNotifyIndexationStruct struct {
+	wg               *sync.WaitGroup
+	client           *goredis.Client
+	typeId, regionId int32
+}
+
+func taskNotifyIndexationFunc(data interface{}) {
+	t := data.(*taskNotifyIndexationStruct)
+	t.notifyIndexation()
+}
+
+func (t *taskNotifyIndexationStruct) notifyIndexation() {
+	args := goredis.XAddArgs{
+		Stream: "indexation",
+		Values: []interface{}{"regionId", t.regionId, "typeId", t.typeId},
+	}
+
+	t.client.XAdd(context.Background(), &args).Result()
 	t.wg.Done()
 }

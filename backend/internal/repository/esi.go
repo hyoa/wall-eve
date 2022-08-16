@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/hyoa/wall-eve/backend/internal/domain"
+	log "github.com/sirupsen/logrus"
 )
 
 type chanFetchOrders struct {
@@ -26,22 +27,26 @@ type UniverseElementName struct {
 	Name string `json:"name"`
 }
 
-func (er *EsiRepository) FetchElementName(typeId int32, kind string) string {
+func (er *EsiRepository) FetchElementName(typeId int64, kind string) string {
 	url := fmt.Sprintf("https://esi.evetech.net/latest/universe/%s/%d/?datasource=tranquility&language=en", kind, typeId)
 	resp, errGet := http.Get(url)
 
 	if errGet != nil {
-		fmt.Printf("Unable to fetch for url %s", url)
+		log.Error("Unable to fetch for url %s \r\n", url)
 	}
 
 	b, errBody := ioutil.ReadAll(resp.Body)
 
 	if errBody != nil {
-		fmt.Printf("Unable to fetch for url %s", url)
+		log.Errorf("Unable to fetch for url %s \r\n", url)
 	}
 
 	var item UniverseElementName
 	json.Unmarshal(b, &item)
+
+	if item.Name == "" {
+		log.Errorf("Unable to fetch for url %s \r\n", url)
+	}
 
 	return item.Name
 }

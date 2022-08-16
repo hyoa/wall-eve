@@ -44,7 +44,7 @@ type Order struct {
 type DenormalizedOrder struct {
 	RegionId     int32   `json:"region_id"`
 	SystemId     int32   `json:"system_id"`
-	LocationId   int32   `json:"location_id"`
+	LocationId   int64   `json:"location_id"`
 	TypeId       int32   `json:"type_id"`
 	RegionName   string  `json:"region_name"`
 	SystemName   string  `json:"system_name"`
@@ -60,7 +60,7 @@ type ExternalDataRepository interface {
 	FetchTypeName(typeId int32) string
 	FetchRegionName(regionId int32) string
 	FetchSystemName(systemId int32) string
-	FetchLocationName(LocationId int32) string
+	FetchLocationName(LocationId int64) string
 }
 
 type ExternalOrdersRepository interface {
@@ -83,7 +83,7 @@ type OrdersRepository interface {
 }
 
 type Notifier interface {
-	NotifyReadyToIndex(regionId, typeId int32) error
+	NotifyReadyToIndex(regionId int32, typeIds map[int32]bool) error
 }
 
 type Filter struct {
@@ -120,19 +120,11 @@ func NewOrderUseCase(externalOrderRepository ExternalOrdersRepository, ordersRep
 
 func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
 	log.Infoln("Fetch orders")
-	// rawOrders, errFetch := ouc.externalOrderRepository.FetchOrders(regionId)
+	rawOrders, errFetch := ouc.externalOrderRepository.FetchOrders(regionId)
 
-	// if errFetch != nil {
-	// 	return fmt.Errorf("Unable to fetch orders for %d: %w", regionId, errFetch)
-	// }
-
-	rawOrders := make([]RawOrder, 0)
-	rawOrders = append(rawOrders, RawOrder{
-		TypeId: 1,
-	})
-	rawOrders = append(rawOrders, RawOrder{
-		TypeId: 2,
-	})
+	if errFetch != nil {
+		return fmt.Errorf("Unable to fetch orders for %d: %w", regionId, errFetch)
+	}
 
 	ordersMapped := make(map[KeyOrder][]int64)
 	typeToIndex := make(map[int32]bool)
@@ -164,24 +156,24 @@ func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
 		typeToIndex[rawOrders[k].TypeId] = true
 	}
 
-	// log.Infoln("Start deletion")
-	// ouc.ordersRepository.RemoveOrdersNotInPool(ordersMapped)
-	// log.Infoln("Deletion completed")
+	log.Infoln("Start deletion")
+	ouc.ordersRepository.RemoveOrdersNotInPool(ordersMapped)
+	log.Infoln("Deletion completed")
 
-	// log.Infoln("Start save order data")
-	// errSave := ouc.ordersRepository.SaveOrders(orders)
-	// if errSave != nil {
-	// 	return fmt.Errorf("Unable to save orders for %d: %w", regionId, errSave)
-	// }
-	// log.Infoln("Save orders data completed")
-
-	// log.Infoln("Start save orders keys")
-	// ouc.ordersRepository.SaveOrdersIdFetch(ordersMapped)
-	// log.Infoln("Save orders keys completed")
-
-	for typeId := range typeToIndex {
-		ouc.notifier.NotifyReadyToIndex(regionId, typeId)
+	log.Infoln("Start save order data")
+	errSave := ouc.ordersRepository.SaveOrders(orders)
+	if errSave != nil {
+		return fmt.Errorf("Unable to save orders for %d: %w", regionId, errSave)
 	}
+	log.Infoln("Save orders data completed")
+
+	log.Infoln("Start save orders keys")
+	ouc.ordersRepository.SaveOrdersIdFetch(ordersMapped)
+	log.Infoln("Save orders keys completed")
+
+	log.Infoln("Notify ready to index")
+	ouc.notifier.NotifyReadyToIndex(regionId, typeToIndex)
+	log.Infoln("End notification")
 
 	return nil
 }
@@ -193,14 +185,20 @@ func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) e
 		return fmt.Errorf("Unable to aggregate orders: %w", errAggregate)
 	}
 
+	ordersWithoutStructure := make([]DenormalizedOrder, 0)
 	for k := range orders {
-		orders[k].LocationName = ouc.externalDataRepository.FetchLocationName(orders[k].LocationId)
-		orders[k].RegionName = ouc.externalDataRepository.FetchRegionName(orders[k].RegionId)
-		// orders[k].SystemName = ouc.externalDataRepository.FetchSystemName(typeId)
-		orders[k].TypeName = ouc.externalDataRepository.FetchTypeName(orders[k].TypeId)
+		if orders[k].LocationId <= 2147483647 {
+			order := orders[k]
+			order.LocationName = ouc.externalDataRepository.FetchLocationName(orders[k].LocationId)
+			order.RegionName = ouc.externalDataRepository.FetchRegionName(orders[k].RegionId)
+			// order.SystemName = ouc.externalDataRepository.FetchSystemName(typeId)
+			order.TypeName = ouc.externalDataRepository.FetchTypeName(orders[k].TypeId)
+
+			ordersWithoutStructure = append(ordersWithoutStructure, order)
+		}
 	}
 
-	ouc.ordersRepository.SaveDenormalizedOrders(orders)
+	ouc.ordersRepository.SaveDenormalizedOrders(ordersWithoutStructure)
 
 	return nil
 }

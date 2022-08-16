@@ -13,22 +13,22 @@ type EsiRepositoryWithCache struct {
 }
 
 func (er *EsiRepositoryWithCache) FetchTypeName(typeId int32) string {
-	return er.fetchElementNameById(typeId, "types")
+	return er.fetchElementNameById(int64(typeId), "types")
 }
 
 func (er *EsiRepositoryWithCache) FetchRegionName(regionId int32) string {
-	return er.fetchElementNameById(regionId, "regions")
+	return er.fetchElementNameById(int64(regionId), "regions")
 }
 
 func (er *EsiRepositoryWithCache) FetchSystemName(systemId int32) string {
-	return er.fetchElementNameById(systemId, "systems")
+	return er.fetchElementNameById(int64(systemId), "systems")
 }
 
-func (er *EsiRepositoryWithCache) FetchLocationName(locationId int32) string {
+func (er *EsiRepositoryWithCache) FetchLocationName(locationId int64) string {
 	return er.fetchElementNameById(locationId, "stations")
 }
 
-func (er *EsiRepositoryWithCache) fetchElementNameById(typeId int32, kind string) string {
+func (er *EsiRepositoryWithCache) fetchElementNameById(typeId int64, kind string) string {
 	key := fmt.Sprintf("%s:%d", kind, typeId)
 	val, exist := er.Cache.Get(fmt.Sprint(key))
 
