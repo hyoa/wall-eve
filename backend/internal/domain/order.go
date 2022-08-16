@@ -3,12 +3,15 @@ package domain
 import (
 	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type OrderUseCase struct {
 	externalOrderRepository ExternalOrdersRepository
 	ordersRepository        OrdersRepository
 	externalDataRepository  ExternalDataRepository
+	notifier                Notifier
 }
 
 type RawOrder struct {
@@ -19,6 +22,7 @@ type RawOrder struct {
 	TypeId      int32   `json:"type_id"`
 	VolumeTotal int32   `json:"volume_total"`
 	IssuedAt    string  `json:"issued"`
+	OrderId     int64   `json:"order_id"`
 }
 
 type Order struct {
@@ -34,6 +38,7 @@ type Order struct {
 	TypeId       int32   `json:"typeId"`
 	VolumeTotal  int32   `json:"volumeTotal"`
 	IssuedAt     int64   `json:"issuedAt"`
+	OrderId      int64   `json:"orderId"`
 }
 
 type DenormalizedOrder struct {
@@ -62,6 +67,10 @@ type ExternalOrdersRepository interface {
 	FetchOrders(regionId int32) ([]RawOrder, error)
 }
 
+type KeyOrder struct {
+	RegionId, TypeId int32
+}
+
 type OrdersRepository interface {
 	SaveOrders([]Order) error
 	DeleteAllOrdersForRegion(regionId int32) error
@@ -69,6 +78,12 @@ type OrdersRepository interface {
 	AggregateOrdersForRegionAndTypeId(regionId int32, typeId int32) ([]DenormalizedOrder, error)
 	SaveDenormalizedOrders([]DenormalizedOrder) error
 	SearchDenormalizedOrders(filter Filter) ([]DenormalizedOrder, error)
+	SaveOrdersIdFetch(ordersKeys map[KeyOrder][]int64) error
+	RemoveOrdersNotInPool(ordersKeys map[KeyOrder][]int64) error
+}
+
+type Notifier interface {
+	NotifyReadyToIndex(regionId, typeId int32) error
 }
 
 type Filter struct {
@@ -94,20 +109,33 @@ func CreateDefaultFilter() Filter {
 	}
 }
 
-func NewOrderUseCase(externalOrderRepository ExternalOrdersRepository, ordersRepository OrdersRepository, externalDataRepository ExternalDataRepository) OrderUseCase {
+func NewOrderUseCase(externalOrderRepository ExternalOrdersRepository, ordersRepository OrdersRepository, externalDataRepository ExternalDataRepository, notifier Notifier) OrderUseCase {
 	return OrderUseCase{
 		externalOrderRepository: externalOrderRepository,
 		ordersRepository:        ordersRepository,
 		externalDataRepository:  externalDataRepository,
+		notifier:                notifier,
 	}
 }
 
 func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
-	rawOrders, errFetch := ouc.externalOrderRepository.FetchOrders(regionId)
+	log.Infoln("Fetch orders")
+	// rawOrders, errFetch := ouc.externalOrderRepository.FetchOrders(regionId)
 
-	if errFetch != nil {
-		return fmt.Errorf("Unable to fetch orders for %d: %w", regionId, errFetch)
-	}
+	// if errFetch != nil {
+	// 	return fmt.Errorf("Unable to fetch orders for %d: %w", regionId, errFetch)
+	// }
+
+	rawOrders := make([]RawOrder, 0)
+	rawOrders = append(rawOrders, RawOrder{
+		TypeId: 1,
+	})
+	rawOrders = append(rawOrders, RawOrder{
+		TypeId: 2,
+	})
+
+	ordersMapped := make(map[KeyOrder][]int64)
+	typeToIndex := make(map[int32]bool)
 
 	orders := make([]Order, 0)
 	for k := range rawOrders {
@@ -124,17 +152,35 @@ func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
 			TypeId:       rawOrders[k].TypeId,
 			VolumeTotal:  rawOrders[k].VolumeTotal,
 			IssuedAt:     parseStringDateToTimestamp(rawOrders[k].IssuedAt),
+			OrderId:      rawOrders[k].OrderId,
 		})
+
+		key := KeyOrder{
+			RegionId: regionId,
+			TypeId:   rawOrders[k].TypeId,
+		}
+
+		ordersMapped[key] = append(ordersMapped[key], rawOrders[k].OrderId)
+		typeToIndex[rawOrders[k].TypeId] = true
 	}
 
-	errDelete := ouc.ordersRepository.DeleteAllOrdersForRegion(regionId)
-	if errDelete != nil {
-		return fmt.Errorf("Unable to delete orders for %d: %w", regionId, errFetch)
-	}
+	// log.Infoln("Start deletion")
+	// ouc.ordersRepository.RemoveOrdersNotInPool(ordersMapped)
+	// log.Infoln("Deletion completed")
 
-	errSave := ouc.ordersRepository.SaveOrders(orders)
-	if errSave != nil {
-		return fmt.Errorf("Unable to save orders for %d: %w", regionId, errFetch)
+	// log.Infoln("Start save order data")
+	// errSave := ouc.ordersRepository.SaveOrders(orders)
+	// if errSave != nil {
+	// 	return fmt.Errorf("Unable to save orders for %d: %w", regionId, errSave)
+	// }
+	// log.Infoln("Save orders data completed")
+
+	// log.Infoln("Start save orders keys")
+	// ouc.ordersRepository.SaveOrdersIdFetch(ordersMapped)
+	// log.Infoln("Save orders keys completed")
+
+	for typeId := range typeToIndex {
+		ouc.notifier.NotifyReadyToIndex(regionId, typeId)
 	}
 
 	return nil
@@ -155,7 +201,6 @@ func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) e
 	}
 
 	ouc.ordersRepository.SaveDenormalizedOrders(orders)
-	ouc.ordersRepository.DeleteAllOrdersForRegionAndTypeId(regionId, typeId)
 
 	return nil
 }

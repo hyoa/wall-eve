@@ -14,7 +14,6 @@ import (
 	"github.com/hyoa/wall-eve/backend/internal/domain"
 	"github.com/nitishm/go-rejson/v4"
 	"github.com/panjf2000/ants/v2"
-	log "github.com/sirupsen/logrus"
 )
 
 type RedisRepository struct {
@@ -40,6 +39,7 @@ type OrdersRedis struct {
 	TypeId       int32   `json:"typeId"`
 	VolumeTotal  int32   `json:"volumeTotal"`
 	IssuedAt     int64   `json:"issuedAt"`
+	OrderId      int64   `json:"orderId"`
 }
 
 type DenormalizedOrderRedis struct {
@@ -107,75 +107,75 @@ func (r *RedisRepository) SaveOrders(orders []domain.Order) error {
 }
 
 func (r *RedisRepository) DeleteAllOrdersForRegion(regionId int32) error {
-	ctx := context.Background()
-	log.Infoln("Scanning keys for deletion")
-	iter := r.client.Scan(ctx, 0, fmt.Sprintf("orders:%d:*", regionId), 0).Iterator()
+	// ctx := context.Background()
+	// log.Infoln("Scanning keys for deletion")
+	// iter := r.client.Scan(ctx, 0, fmt.Sprintf("orders:%d:*", regionId), 0).Iterator()
 
-	log.Infoln("Prepare deletion")
-	pool, _ := ants.NewPoolWithFunc(100, taskDeleteOrderFunc)
-	defer pool.Release()
+	// log.Infoln("Prepare deletion")
+	// pool, _ := ants.NewPoolWithFunc(1000, taskDeleteOrderFunc)
+	// defer pool.Release()
 
-	var wg sync.WaitGroup
-	tasks := make([]*taskDeleteOrderStruct, 0)
+	// var wg sync.WaitGroup
+	// tasks := make([]*taskDeleteOrderStruct, 0)
 
-	for iter.Next(ctx) {
-		key := iter.Val()
+	// for iter.Next(ctx) {
+	// 	key := iter.Val()
 
-		task := &taskDeleteOrderStruct{
-			wg:     &wg,
-			client: r.client,
-			key:    key,
-		}
+	// 	task := &taskDeleteOrderStruct{
+	// 		wg:     &wg,
+	// 		client: r.client,
+	// 		key:    key,
+	// 	}
 
-		wg.Add(1)
-		tasks = append(tasks, task)
-		pool.Invoke(task)
-	}
+	// 	wg.Add(1)
+	// 	tasks = append(tasks, task)
+	// 	pool.Invoke(task)
+	// }
 
-	if err := iter.Err(); err != nil {
-		panic(err)
-	}
+	// if err := iter.Err(); err != nil {
+	// 	panic(err)
+	// }
 
-	wg.Wait()
+	// wg.Wait()
 
 	return nil
 }
 
 func (r *RedisRepository) DeleteAllOrdersForRegionAndTypeId(regionId, typeId int32) error {
-	ctx := context.Background()
-	log.Infoln("Scanning keys for deletion: ", regionId, typeId)
-	iter := r.client.Scan(ctx, 0, fmt.Sprintf("orders:%d:*", regionId), 0).Iterator()
+	// ctx := context.Background()
+	// log.Infoln("Scanning keys for deletion: ", regionId, typeId)
+	// iter := r.client.Scan(ctx, 0, fmt.Sprintf("orders:%d:*", regionId), 0).Iterator()
 
-	log.Infoln("Prepare deletion")
-	pool, _ := ants.NewPoolWithFunc(100, taskDeleteOrderFunc, ants.WithPanicHandler(panicHandler))
-	defer pool.Release()
+	// log.Infoln("Prepare deletion")
+	// pool, _ := ants.NewPoolWithFunc(100, taskDeleteOrderFunc, ants.WithPanicHandler(panicHandler))
+	// defer pool.Release()
 
-	var wg sync.WaitGroup
-	tasks := make([]*taskDeleteOrderStruct, 0)
+	// var wg sync.WaitGroup
+	// tasks := make([]*taskDeleteOrderStruct, 0)
 
-	for iter.Next(ctx) {
-		key := iter.Val()
+	// for iter.Next(ctx) {
+	// 	key := iter.Val()
 
-		if strings.Contains(key, fmt.Sprintf("%d", typeId)) {
-			task := &taskDeleteOrderStruct{
-				wg:     &wg,
-				client: r.client,
-				key:    key,
-			}
+	// 	if strings.Contains(key, fmt.Sprintf("%d", typeId)) {
+	// 		task := &taskDeleteOrderStruct{
+	// 			wg:     &wg,
+	// 			client: r.client,
+	// 			key:    key,
+	// 		}
 
-			wg.Add(1)
-			tasks = append(tasks, task)
-			pool.Invoke(task)
-		}
+	// 		wg.Add(1)
+	// 		tasks = append(tasks, task)
+	// 		pool.Invoke(task)
+	// 	}
 
-	}
+	// }
 
-	if err := iter.Err(); err != nil {
-		panic(err)
-	}
+	// if err := iter.Err(); err != nil {
+	// 	panic(err)
+	// }
 
-	log.Infoln("Wait for deletion completion")
-	wg.Wait()
+	// log.Infoln("Wait for deletion completion")
+	// wg.Wait()
 
 	return nil
 }
@@ -353,6 +353,65 @@ func (r *RedisRepository) Save(key, value string) error {
 	return r.client.Set(context.Background(), key, value, 0).Err()
 }
 
+func (r *RedisRepository) SaveOrdersIdFetch(ordersKeys map[domain.KeyOrder][]int64) error {
+	pool, _ := ants.NewPoolWithFunc(1000, taskSaveOrdersKeysFunc, ants.WithPanicHandler(panicHandler))
+	defer pool.Release()
+
+	var wg sync.WaitGroup
+	tasks := make([]*taskSaveOrdersKeysStruct, 0)
+
+	for key := range ordersKeys {
+		task := &taskSaveOrdersKeysStruct{
+			wg:        &wg,
+			client:    r.client,
+			key:       key,
+			ordersIds: ordersKeys[key],
+		}
+
+		wg.Add(1)
+		tasks = append(tasks, task)
+		pool.Invoke(task)
+	}
+
+	wg.Wait()
+	return nil
+}
+
+func (r *RedisRepository) RemoveOrdersNotInPool(ordersKeys map[domain.KeyOrder][]int64) error {
+	pool, _ := ants.NewPoolWithFunc(1000, taskDeleteOrderFunc)
+	defer pool.Release()
+
+	var wg sync.WaitGroup
+	tasks := make([]*taskDeleteOrderStruct, 0)
+
+	for key := range ordersKeys {
+		task := &taskDeleteOrderStruct{
+			wg:        &wg,
+			client:    r.client,
+			key:       key,
+			ordersIds: ordersKeys[key],
+		}
+		wg.Add(1)
+		tasks = append(tasks, task)
+		pool.Invoke(task)
+
+	}
+
+	wg.Wait()
+	return nil
+}
+
+func (r *RedisRepository) NotifyReadyToIndex(regionId, typeId int32) error {
+	args := goredis.XAddArgs{
+		Stream: "indexation",
+		Values: []interface{}{"regionId", regionId, "typeId", typeId},
+	}
+	res, _ := r.client.XAdd(context.Background(), &args).Result()
+	fmt.Println(res)
+
+	return nil
+}
+
 func panicHandler(err interface{}) {
 	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
@@ -385,9 +444,10 @@ func (t *taskSaveOrderStruct) saveOrder() {
 		TypeId:       t.order.TypeId,
 		VolumeTotal:  t.order.VolumeTotal,
 		IssuedAt:     t.order.IssuedAt,
+		OrderId:      t.order.OrderId,
 	}
 
-	res, errSet := t.rh.JSONSet(fmt.Sprintf("orders:%d:%d:%d", formattedOrder.RegionId, formattedOrder.TypeId, t.index), ".", formattedOrder)
+	res, errSet := t.rh.JSONSet(fmt.Sprintf("orders:%d", formattedOrder.OrderId), ".", formattedOrder)
 
 	if errSet != nil {
 		fmt.Println(errSet)
@@ -408,9 +468,10 @@ func (t *taskSaveOrderStruct) saveOrder() {
 }
 
 type taskDeleteOrderStruct struct {
-	wg     *sync.WaitGroup
-	client *goredis.Client
-	key    string
+	wg        *sync.WaitGroup
+	client    *goredis.Client
+	key       domain.KeyOrder
+	ordersIds []int64
 }
 
 func taskDeleteOrderFunc(data interface{}) {
@@ -419,7 +480,29 @@ func taskDeleteOrderFunc(data interface{}) {
 }
 
 func (t *taskDeleteOrderStruct) deleteOrder() {
-	t.client.Del(context.Background(), t.key)
+	keyToGet := fmt.Sprintf("ordersKeys:%d:%d", t.key.RegionId, t.key.TypeId)
+	ordersIdSaved, _ := t.client.SMembers(context.Background(), keyToGet).Result()
+
+	ordersId := make([]int64, 0)
+	for k := range ordersIdSaved {
+		v, _ := strconv.Atoi(ordersIdSaved[k])
+		ordersId = append(ordersId, int64(v))
+	}
+
+	for _, id := range ordersId {
+		found := false
+		for _, newId := range t.ordersIds {
+			if id == int64(newId) {
+				found = true
+			}
+		}
+
+		if !found {
+			t.client.Del(context.Background(), fmt.Sprintf("orders:%d", id))
+		}
+	}
+
+	t.client.Del(context.Background(), keyToGet)
 	t.wg.Done()
 }
 
@@ -521,4 +604,25 @@ func parseSearchOrders(data interface{}) []DenormalizedOrderRedis {
 	}
 
 	return orders
+}
+
+type taskSaveOrdersKeysStruct struct {
+	wg        *sync.WaitGroup
+	key       domain.KeyOrder
+	ordersIds []int64
+	client    *goredis.Client
+}
+
+func taskSaveOrdersKeysFunc(data interface{}) {
+	t := data.(*taskSaveOrdersKeysStruct)
+	t.saveKeys()
+}
+
+func (t *taskSaveOrdersKeysStruct) saveKeys() {
+	keyToSave := fmt.Sprintf("ordersKeys:%d:%d", t.key.RegionId, t.key.TypeId)
+	for _, id := range t.ordersIds {
+		t.client.SAdd(context.Background(), keyToSave, id).Result()
+	}
+
+	t.wg.Done()
 }

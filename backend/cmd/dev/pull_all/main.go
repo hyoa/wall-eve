@@ -15,8 +15,9 @@ func main() {
 	client := goredis.NewClient(&goredis.Options{Addr: addr, Username: os.Getenv("REDIS_USER"), Password: os.Getenv("REDIS_PASSWORD")})
 	orderRepo := repository.NewRedisRepository(client)
 	externalDataRepo := repository.EsiRepositoryWithCache{}
+	notifier := repository.NewRedisRepository(client)
 
-	orderUseCase := domain.NewOrderUseCase(&externalOrderRepo, orderRepo, &externalDataRepo)
+	orderUseCase := domain.NewOrderUseCase(&externalOrderRepo, orderRepo, &externalDataRepo, notifier)
 
 	orderUseCase.FetchAllOrdersForRegion(10000032)
 
