@@ -143,34 +143,24 @@ func (r *RedisRepository) DeleteAllOrdersForRegion(regionId int32) error {
 }
 
 func (r *RedisRepository) DeleteAllOrdersForRegionAndTypeId(regionId, typeId int32) error {
-	keyToGet := fmt.Sprintf("ordersKeys:%d:%d", regionId, typeId)
-	ordersIdSaved, _ := r.client.SMembers(context.Background(), keyToGet).Result()
+	for {
+		val, _ := r.client.Do(
+			context.Background(),
+			"FT.SEARCH", "denormalizedOrdersIdx",
+			fmt.Sprintf("@typeId:[%d %d] @regionId:[%d %d]", typeId, typeId, regionId, regionId),
+			"LIMIT", 0, 1000,
+		).Result()
 
-	ordersId := make([]int64, 0)
-	for k := range ordersIdSaved {
-		v, _ := strconv.Atoi(ordersIdSaved[k])
-		ordersId = append(ordersId, int64(v))
-	}
+		keys, total := parseSearchOrdersForKey(val)
 
-	pool, _ := ants.NewPoolWithFunc(1000, taskDeleteOrderFunc)
-	defer pool.Release()
-
-	var wg sync.WaitGroup
-	tasks := make([]*taskDeleteOrderStruct, 0)
-
-	for _, id := range ordersId {
-		task := &taskDeleteOrderStruct{
-			wg:      &wg,
-			client:  r.client,
-			orderId: id,
+		for _, k := range keys {
+			r.client.Del(context.Background(), k)
 		}
-		wg.Add(1)
-		tasks = append(tasks, task)
-		pool.Invoke(task)
-	}
 
-	wg.Wait()
-	r.client.Del(context.Background(), keyToGet)
+		if total < 1000 {
+			break
+		}
+	}
 
 	return nil
 }
@@ -239,13 +229,16 @@ func (r *RedisRepository) SaveDenormalizedOrders(orders []domain.DenormalizedOrd
 			RegionName:   orders[k].RegionName,
 			LocationId:   orders[k].LocationId,
 			LocationName: orders[k].LocationName,
+			SystemId:     orders[k].SystemId,
+			SystemName:   orders[k].SystemName,
 			TypeId:       orders[k].TypeId,
 			TypeName:     orders[k].TypeName,
 			BuyPrice:     orders[k].BuyPrice,
 			SellPrice:    orders[k].SellPrice,
 		}
 
-		_, errSet := rh.JSONSet(fmt.Sprintf("denormalizedOrders:%d:%d", formattedDenormalizedOrder.LocationId, formattedDenormalizedOrder.TypeId), ".", formattedDenormalizedOrder)
+		key := fmt.Sprintf("denormalizedOrders:%d:%d", formattedDenormalizedOrder.LocationId, formattedDenormalizedOrder.TypeId)
+		_, errSet := rh.JSONSet(key, ".", formattedDenormalizedOrder)
 
 		if errSet != nil {
 			fmt.Println(errSet)
@@ -532,6 +525,36 @@ func parseFormattedArray(data []interface{}) string {
 	return strings.Join(elements, ",")
 }
 
+func parseSearchOrdersForKey(data interface{}) ([]string, int) {
+	totalCount := 0
+	elements := make([]interface{}, 0)
+
+	// Remove counter
+	switch val := data.(type) {
+	case []interface{}:
+		for i := 1; i < len(val); i++ {
+			elements = append(elements, val[i])
+		}
+
+		switch valCount := val[0].(type) {
+		case int64:
+			totalCount = int(valCount)
+		}
+	default:
+		panic("Wrong element")
+	}
+
+	keys := make([]string, 0)
+	for k := range elements {
+		switch val := elements[k].(type) {
+		case string:
+			keys = append(keys, val)
+		}
+	}
+
+	return keys, totalCount
+}
+
 func parseSearchOrders(data interface{}) []DenormalizedOrderRedis {
 	orders := make([]DenormalizedOrderRedis, 0)
 
@@ -607,4 +630,136 @@ func (t *taskNotifyIndexationStruct) notifyIndexation() {
 
 	t.client.XAdd(context.Background(), &args).Result()
 	t.wg.Done()
+}
+
+func (r *RedisRepository) NotifyItemsIndexation(regionId int32, itemsIds []int, kind string) error {
+	pool, _ := ants.NewPoolWithFunc(1000, taskNotifyItemsToFetchFunc, ants.WithPanicHandler(panicHandler))
+	defer pool.Release()
+
+	var wg sync.WaitGroup
+	tasks := make([]*taskNotifyItemsToFetchStruct, 0)
+
+	var streamName string
+
+	if kind == "add" {
+		streamName = "indexationAdd"
+	} else {
+		streamName = "indexationRemove"
+	}
+
+	for _, id := range itemsIds {
+		task := &taskNotifyItemsToFetchStruct{
+			wg:         &wg,
+			client:     r.client,
+			typeId:     id,
+			regionId:   int(regionId),
+			streamName: streamName,
+		}
+
+		wg.Add(1)
+		tasks = append(tasks, task)
+		pool.Invoke(task)
+	}
+
+	wg.Wait()
+	return nil
+}
+
+type taskNotifyItemsToFetchStruct struct {
+	wg               *sync.WaitGroup
+	client           *goredis.Client
+	typeId, regionId int
+	streamName       string
+}
+
+func taskNotifyItemsToFetchFunc(data interface{}) {
+	t := data.(*taskNotifyItemsToFetchStruct)
+	t.notifyItemIndexation()
+}
+
+func (t *taskNotifyItemsToFetchStruct) notifyItemIndexation() {
+	args := goredis.XAddArgs{
+		Stream: t.streamName,
+		Values: []interface{}{"regionId", t.regionId, "typeId", t.typeId},
+	}
+
+	t.client.XAdd(context.Background(), &args).Result()
+	t.wg.Done()
+}
+
+func (r *RedisRepository) GetIntersectOnIndexWithItems(regionId int32, itemsId []int) ([]int, []int, error) {
+	itemsIndexed, _ := r.client.SMembers(context.Background(), fmt.Sprintf("itemsIndexed:%d", regionId)).Result()
+
+	notIndexed := make([]int, 0)
+	for _, id := range itemsId {
+		found := false
+
+		for _, idIndexed := range itemsIndexed {
+			v, _ := strconv.Atoi(idIndexed)
+			if v == id {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			notIndexed = append(notIndexed, id)
+		}
+	}
+
+	toRemoveFromIndex := make([]int, 0)
+	for _, idIndexed := range itemsIndexed {
+		found := false
+		v, _ := strconv.Atoi(idIndexed)
+
+		for _, id := range itemsId {
+			if v == id {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			toRemoveFromIndex = append(toRemoveFromIndex, int(v))
+		}
+	}
+
+	fmt.Println(notIndexed, toRemoveFromIndex)
+
+	return notIndexed, toRemoveFromIndex, nil
+}
+
+type taskIsItemIndexedStruct struct {
+	wg               *sync.WaitGroup
+	regionId, itemId int32
+	isIndexed        bool
+	client           *goredis.Client
+}
+
+func taskIsItemIndexedFunc(data interface{}) {
+	t := data.(*taskIsItemIndexedStruct)
+	t.isItemIndexed()
+}
+
+func (t *taskIsItemIndexedStruct) isItemIndexed() {
+	isMember, _ := t.client.SIsMember(context.Background(), fmt.Sprintf("itemsIndexed:%d", t.regionId), t.itemId).Result()
+
+	t.isIndexed = isMember
+	t.wg.Done()
+}
+
+func (r *RedisRepository) IsItemIndexForRegionId(regionId, itemId int32) (bool, error) {
+	return r.client.SIsMember(context.Background(), fmt.Sprintf("itemsIndexed:%d", regionId), itemId).Result()
+}
+
+func (r *RedisRepository) AddItemInIndexForRegionId(regionId, itemId int32) error {
+	_, errAdd := r.client.SAdd(context.Background(), fmt.Sprintf("itemsIndexed:%d", regionId), itemId).Result()
+
+	return fmt.Errorf("Unable to add to index: %w", errAdd)
+}
+
+func (r *RedisRepository) RemoveItemFromIndexForRegionId(regionId, itemId int32) error {
+	_, errRemove := r.client.SRem(context.Background(), fmt.Sprintf("itemsIndexed:%d", regionId), itemId).Result()
+
+	return fmt.Errorf("Unable to remove from index: %w", errRemove)
 }

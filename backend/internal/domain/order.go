@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -64,7 +65,7 @@ type ExternalDataRepository interface {
 }
 
 type ExternalOrdersRepository interface {
-	FetchOrders(regionId int32) ([]RawOrder, error)
+	FetchOrdersForRegionAndType(regionId, typeId int32) ([]RawOrder, error)
 }
 
 type KeyOrder struct {
@@ -118,84 +119,117 @@ func NewOrderUseCase(externalOrderRepository ExternalOrdersRepository, ordersRep
 	}
 }
 
-func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
+func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) error {
 	log.Infoln("Fetch orders")
-	rawOrders, errFetch := ouc.externalOrderRepository.FetchOrders(regionId)
+	rawOrders, errFetch := ouc.externalOrderRepository.FetchOrdersForRegionAndType(regionId, typeId)
 
 	if errFetch != nil {
 		return fmt.Errorf("Unable to fetch orders for %d: %w", regionId, errFetch)
 	}
 
-	ordersMapped := make(map[KeyOrder][]int64)
-	typeToIndex := make(map[int32]bool)
+	type keyLocationIdTypeId struct {
+		locationId int64
+		typeId     int32
+	}
 
-	orders := make([]Order, 0)
+	type ordersMappedByLocationAndType struct {
+		sellPrices  []float64
+		buyPrices   []float64
+		sellVolumes []int
+		buyVolumes  []int
+		systemId    int
+		regionId    int
+	}
+
+	log.Infoln("Regroup orders")
+	ordersMapped := make(map[keyLocationIdTypeId]ordersMappedByLocationAndType)
 	for k := range rawOrders {
-		orders = append(orders, Order{
-			IsBuyOrder:   rawOrders[k].IsBuyOrder,
-			RegionId:     regionId,
-			TypeName:     "",
-			RegionName:   "",
-			SystemName:   "",
-			LocationName: "",
-			LocationId:   rawOrders[k].LocationId,
-			Price:        rawOrders[k].Price,
-			SystemId:     rawOrders[k].SystemId,
-			TypeId:       rawOrders[k].TypeId,
-			VolumeTotal:  rawOrders[k].VolumeTotal,
-			IssuedAt:     parseStringDateToTimestamp(rawOrders[k].IssuedAt),
-			OrderId:      rawOrders[k].OrderId,
-		})
-
-		key := KeyOrder{
-			RegionId: regionId,
-			TypeId:   rawOrders[k].TypeId,
+		var order ordersMappedByLocationAndType
+		key := keyLocationIdTypeId{
+			typeId:     rawOrders[k].TypeId,
+			locationId: rawOrders[k].LocationId,
 		}
 
-		ordersMapped[key] = append(ordersMapped[key], rawOrders[k].OrderId)
-		typeToIndex[rawOrders[k].TypeId] = true
+		if val, ok := ordersMapped[key]; ok {
+			order = ordersMappedByLocationAndType{
+				sellPrices:  val.sellPrices,
+				buyPrices:   val.buyPrices,
+				sellVolumes: val.sellVolumes,
+				buyVolumes:  val.buyVolumes,
+				regionId:    val.regionId,
+				systemId:    val.systemId,
+			}
+		} else {
+			order = ordersMappedByLocationAndType{
+				sellPrices:  make([]float64, 0),
+				buyPrices:   make([]float64, 0),
+				sellVolumes: make([]int, 0),
+				buyVolumes:  make([]int, 0),
+				regionId:    int(regionId),
+				systemId:    int(rawOrders[k].SystemId),
+			}
+		}
+
+		if rawOrders[k].IsBuyOrder {
+			order.buyPrices = append(order.buyPrices, rawOrders[k].Price)
+			order.buyVolumes = append(order.buyVolumes, int(rawOrders[k].VolumeTotal))
+		} else {
+			order.sellPrices = append(order.sellPrices, rawOrders[k].Price)
+			order.sellVolumes = append(order.sellVolumes, int(rawOrders[k].VolumeTotal))
+		}
+
+		ordersMapped[key] = order
 	}
 
-	log.Infoln("Start save order data")
-	errSave := ouc.ordersRepository.SaveOrders(orders)
-	if errSave != nil {
-		return fmt.Errorf("Unable to save orders for %d: %w", regionId, errSave)
+	log.Infoln("Denormalized orders")
+	denormalizedOrders := make([]DenormalizedOrder, 0)
+	for k := range ordersMapped {
+		sort.Float64s(ordersMapped[k].buyPrices)
+		sort.Float64s(ordersMapped[k].sellPrices)
+		sort.Ints(ordersMapped[k].buyVolumes)
+		sort.Ints(ordersMapped[k].sellVolumes)
+
+		var maxBuyPrice float64
+		if len(ordersMapped[k].buyPrices) > 0 {
+			maxBuyPrice = ordersMapped[k].buyPrices[len(ordersMapped[k].buyPrices)-1]
+		}
+		var minSellPrice float64
+		if len(ordersMapped[k].sellPrices) > 0 {
+			minSellPrice = ordersMapped[k].sellPrices[0]
+		}
+
+		denormalizedOrders = append(denormalizedOrders, DenormalizedOrder{
+			RegionId:   int32(ordersMapped[k].regionId),
+			LocationId: k.locationId,
+			SystemId:   int32(ordersMapped[k].systemId),
+			TypeId:     k.typeId,
+			BuyPrice:   maxBuyPrice,
+			SellPrice:  minSellPrice,
+		})
 	}
-	log.Infoln("Save orders data completed")
 
-	log.Infoln("Start save orders keys")
-	ouc.ordersRepository.SaveOrdersIdFetch(ordersMapped)
-	log.Infoln("Save orders keys completed")
-
-	log.Infoln("Notify ready to index")
-	ouc.notifier.NotifyReadyToIndex(regionId, typeToIndex)
-	log.Infoln("End notification")
-
-	return nil
-}
-
-func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) error {
-	orders, errAggregate := ouc.ordersRepository.AggregateOrdersForRegionAndTypeId(regionId, typeId)
-
-	if errAggregate != nil {
-		return fmt.Errorf("Unable to aggregate orders: %w", errAggregate)
-	}
-
+	log.Infoln("Fetch denormalizedOrders extra data")
 	ordersWithoutStructure := make([]DenormalizedOrder, 0)
-	for k := range orders {
-		if orders[k].LocationId <= 2147483647 {
-			order := orders[k]
-			order.LocationName = ouc.externalDataRepository.FetchLocationName(orders[k].LocationId)
-			order.RegionName = ouc.externalDataRepository.FetchRegionName(orders[k].RegionId)
-			// order.SystemName = ouc.externalDataRepository.FetchSystemName(typeId)
-			order.TypeName = ouc.externalDataRepository.FetchTypeName(orders[k].TypeId)
+	for k := range denormalizedOrders {
+		if denormalizedOrders[k].LocationId <= 2147483647 {
+			order := denormalizedOrders[k]
+			order.LocationName = ouc.externalDataRepository.FetchLocationName(denormalizedOrders[k].LocationId)
+			order.RegionName = ouc.externalDataRepository.FetchRegionName(denormalizedOrders[k].RegionId)
+			order.SystemName = ouc.externalDataRepository.FetchSystemName(denormalizedOrders[k].SystemId)
+			order.TypeName = ouc.externalDataRepository.FetchTypeName(denormalizedOrders[k].TypeId)
 
 			ordersWithoutStructure = append(ordersWithoutStructure, order)
 		}
 	}
 
+	log.Infoln("Save denormalizedOrders")
 	ouc.ordersRepository.SaveDenormalizedOrders(ordersWithoutStructure)
-	ouc.ordersRepository.DeleteAllOrdersForRegionAndTypeId(regionId, typeId)
+
+	return nil
+}
+
+func (ouc *OrderUseCase) DeleteIndexedOrdersForRegionAndType(regionId, typeId int) error {
+	ouc.ordersRepository.DeleteAllOrdersForRegionAndTypeId(int32(regionId), int32(typeId))
 
 	return nil
 }

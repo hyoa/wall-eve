@@ -24,7 +24,7 @@ func main() {
 
 	orderUseCase := domain.NewOrderUseCase(&externalOrderRepo, orderRepo, &externalDataRepository, notifier)
 
-	orderUseCase.IndexOrdersForRegionAndTypeId(10000032, 648)
+	orderUseCase.DeleteIndexedOrdersForRegionAndType(10000032, 648)
 
 	defer func() {
 		if err := client.Close(); err != nil {
