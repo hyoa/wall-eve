@@ -786,3 +786,9 @@ func (r *RedisRepository) NotifyIndexationFinished(regionId, typeId int) error {
 
 	return nil
 }
+
+func (r *RedisRepository) NotifyItemIndexationWithDelay(regionId, typeId, delay int) error {
+	r.client.ZAdd(context.Background(), "indexationDelayed", &goredis.Z{Score: float64(delay), Member: fmt.Sprintf("%d:%d", regionId, typeId)})
+
+	return nil
+}

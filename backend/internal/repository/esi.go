@@ -58,7 +58,7 @@ func (er *EsiRepository) FetchElementName(typeId int64, kind string) string {
 }
 
 func (er *EsiRepository) GetItemsIdOnMarketForRegion(regionId int32) ([]int, error) {
-	return []int{3977, 1957, 9371, 12217, 648}, nil
+	return []int{3977, 1957, 9371, 18841, 12217, 648}, nil
 
 	// return getItemsOnMarketForRegion(int(regionId))
 }

@@ -33,6 +33,7 @@ type ItemRepository interface {
 
 type ItemNotifier interface {
 	NotifyItemsIndexation(regionId int32, itemsIds []int, kind string) error
+	NotifyItemIndexationWithDelay(regionId, itemId, delay int) error
 }
 
 func (iuc *ItemUseCase) FindItemToFetch(regionId int32) error {
@@ -74,4 +75,8 @@ func (iuc *ItemUseCase) RemoveItemFromIndexForRegionId(regionId, itemId int32) e
 	iuc.itemRepository.RemoveItemFromIndexForRegionId(regionId, itemId)
 
 	return nil
+}
+
+func (iuc *ItemUseCase) ScheduleItemIndexation(regionId, itemId int, delay int) error {
+	return iuc.notifier.NotifyItemIndexationWithDelay(regionId, itemId, delay)
 }

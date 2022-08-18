@@ -120,6 +120,7 @@ func runIndexation(c chan chanIndex, message goredis.XMessage, useCase *domain.O
 
 	useCase.IndexOrdersForRegionAndTypeId(index.regionId, index.typeId)
 	itemUseCase.SetItemAsIndexedForRegionId(index.regionId, index.typeId)
+	itemUseCase.ScheduleItemIndexation(int(index.regionId), int(index.typeId), int(time.Now().Unix())+300)
 
 	log.Infoln(message.ID)
 
