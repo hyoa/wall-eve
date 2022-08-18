@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	goredis "github.com/go-redis/redis/v8"
 	"github.com/hyoa/wall-eve/backend/internal/domain"
@@ -762,4 +763,26 @@ func (r *RedisRepository) RemoveItemFromIndexForRegionId(regionId, itemId int32)
 	_, errRemove := r.client.SRem(context.Background(), fmt.Sprintf("itemsIndexed:%d", regionId), itemId).Result()
 
 	return fmt.Errorf("Unable to remove from index: %w", errRemove)
+}
+
+func (r *RedisRepository) AddTotalOrdersForRegionAndType(regionId, typeId, ordersCount int) error {
+	r.client.Do(
+		context.Background(),
+		"TS.ADD", fmt.Sprintf("ordersCount:%d:%d", regionId, typeId),
+		time.Now().Unix(),
+		ordersCount,
+	)
+
+	return nil
+}
+
+func (r *RedisRepository) NotifyIndexationFinished(regionId, typeId int) error {
+	args := goredis.XAddArgs{
+		Stream: "indexationFinished",
+		Values: []interface{}{"regionId", regionId, "typeId", typeId},
+	}
+
+	r.client.XAdd(context.Background(), &args).Result()
+
+	return nil
 }

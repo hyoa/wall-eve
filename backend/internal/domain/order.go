@@ -81,10 +81,11 @@ type OrdersRepository interface {
 	SearchDenormalizedOrders(filter Filter) ([]DenormalizedOrder, error)
 	SaveOrdersIdFetch(ordersKeys map[KeyOrder][]int64) error
 	RemoveOrdersNotInPool(ordersKeys map[KeyOrder][]int64) error
+	AddTotalOrdersForRegionAndType(regionId, typeId, ordersCount int) error
 }
 
 type Notifier interface {
-	NotifyReadyToIndex(regionId int32, typeIds map[int32]bool) error
+	NotifyIndexationFinished(regionId, typeId int) error
 }
 
 type Filter struct {
@@ -224,6 +225,7 @@ func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) e
 
 	log.Infoln("Save denormalizedOrders")
 	ouc.ordersRepository.SaveDenormalizedOrders(ordersWithoutStructure)
+	ouc.notifier.NotifyIndexationFinished(int(regionId), int(typeId))
 
 	return nil
 }
