@@ -1,4 +1,4 @@
-package unindexer_cmd
+package indexer_cmd
 
 import (
 	"context"
@@ -16,14 +16,12 @@ import (
 type chanIndex struct{}
 
 func init() {
-	checkCmd.MarkFlagRequired("configPath")
-
 	rootCmd.AddCommand(checkCmd)
 }
 
 var checkCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Read stream to delete index data",
+	Short: "Read stream to index data",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		externalOrderRepo := repository.EsiRepository{}
@@ -47,7 +45,7 @@ var checkCmd = &cobra.Command{
 
 		checkBackLog := true
 		for {
-			log.Infoln("Listen delete")
+			log.Infoln("Listen")
 
 			var idToCheck string
 			if checkBackLog {
@@ -56,14 +54,14 @@ var checkCmd = &cobra.Command{
 				idToCheck = ">"
 			}
 
-			xReadArgs := goredis.XReadGroupArgs{
-				Streams:  []string{"indexationRemove", idToCheck},
+			args := goredis.XReadGroupArgs{
+				Streams:  []string{"indexationAdd", idToCheck},
 				Count:    100,
 				Block:    2 * time.Second,
-				Group:    "indexationRemoveGroup",
+				Group:    "indexationAddGroup",
 				Consumer: args[0],
 			}
-			res, _ := client.XReadGroup(context.Background(), &xReadArgs).Result()
+			res, _ := client.XReadGroup(context.Background(), &args).Result()
 
 			// if errXRead != nil {
 			// 	log.Errorln(errXRead)
@@ -84,7 +82,7 @@ var checkCmd = &cobra.Command{
 
 				log.Infoln("Indexing ", len(messages), " messages")
 				for i := 0; i < len(messages); i++ {
-					go runDeleteIndexation(c, messages[i], &orderUseCase, &itemUseCase, client)
+					go runIndexation(c, messages[i], &orderUseCase, &itemUseCase, client)
 				}
 
 			}
@@ -99,7 +97,7 @@ var checkCmd = &cobra.Command{
 	},
 }
 
-func runDeleteIndexation(c chan chanIndex, message goredis.XMessage, useCase *domain.OrderUseCase, itemUseCase *domain.ItemUseCase, client *goredis.Client) {
+func runIndexation(c chan chanIndex, message goredis.XMessage, useCase *domain.OrderUseCase, itemUseCase *domain.ItemUseCase, client *goredis.Client) {
 	index := struct {
 		regionId, typeId int32
 	}{}
@@ -120,10 +118,22 @@ func runDeleteIndexation(c chan chanIndex, message goredis.XMessage, useCase *do
 		}
 	}
 
-	useCase.DeleteIndexedOrdersForRegionAndType(int(index.regionId), int(index.typeId))
-	itemUseCase.RemoveItemFromIndexForRegionId(index.regionId, index.typeId)
+	useCase.IndexOrdersForRegionAndTypeId(index.regionId, index.typeId)
+	itemUseCase.SetItemAsIndexedForRegionId(index.regionId, index.typeId)
 
-	client.XAck(context.Background(), "indexationRemove", "indexationRemoveGroup", message.ID).Result()
-	client.XDel(context.Background(), "indexationRemove", message.ID)
+	log.Infoln(message.ID)
+
+	_, errAck := client.XAck(context.Background(), "indexationAdd", "indexationAddGroup", message.ID).Result()
+
+	if errAck != nil {
+		log.Errorln(errAck)
+	}
+
+	_, errDel := client.XDel(context.Background(), "indexationAdd", message.ID).Result()
+
+	if errDel != nil {
+		log.Errorln(errDel)
+	}
+
 	c <- chanIndex{}
 }
