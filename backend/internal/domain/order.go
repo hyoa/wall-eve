@@ -156,10 +156,6 @@ func (ouc *OrderUseCase) FetchAllOrdersForRegion(regionId int32) error {
 		typeToIndex[rawOrders[k].TypeId] = true
 	}
 
-	log.Infoln("Start deletion")
-	ouc.ordersRepository.RemoveOrdersNotInPool(ordersMapped)
-	log.Infoln("Deletion completed")
-
 	log.Infoln("Start save order data")
 	errSave := ouc.ordersRepository.SaveOrders(orders)
 	if errSave != nil {
@@ -199,6 +195,7 @@ func (ouc *OrderUseCase) IndexOrdersForRegionAndTypeId(regionId, typeId int32) e
 	}
 
 	ouc.ordersRepository.SaveDenormalizedOrders(ordersWithoutStructure)
+	ouc.ordersRepository.DeleteAllOrdersForRegionAndTypeId(regionId, typeId)
 
 	return nil
 }
