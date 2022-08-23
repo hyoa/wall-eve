@@ -5,22 +5,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v8"
-	"github.com/hyoa/wall-eve/backend/internal/controller"
-	"github.com/hyoa/wall-eve/backend/internal/domain"
-	"github.com/hyoa/wall-eve/backend/internal/repository"
+	"github.com/hyoa/wall-eve/backend/controller"
 )
 
 func main() {
-	externalOrderRepo := repository.EsiRepository{}
 	var addr = os.Getenv("REDIS_ADDR")
 	client := goredis.NewClient(&goredis.Options{Addr: addr, Username: os.Getenv("REDIS_USER"), Password: os.Getenv("REDIS_PASSWORD")})
-	orderRepo := repository.NewRedisRepository(client)
-	externalDataRepo := repository.EsiRepositoryWithCache{}
-	notifier := repository.NewRedisRepository(client)
 
-	orderUseCase := domain.NewOrderUseCase(&externalOrderRepo, orderRepo, &externalDataRepo, notifier)
-
-	c := controller.NewOrderController(orderUseCase)
+	c := controller.NewOrderController(client)
 
 	r := gin.Default()
 	r.GET("/orders", c.GetOrdersWithFilter)

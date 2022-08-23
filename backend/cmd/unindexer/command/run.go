@@ -54,14 +54,12 @@ var checkCmd = &cobra.Command{
 				idToCheck = ">"
 			}
 
-			xReadArgs := goredis.XReadGroupArgs{
-				Streams:  []string{"indexationRemove", idToCheck},
-				Count:    100,
-				Block:    2 * time.Second,
-				Group:    "indexationRemoveGroup",
-				Consumer: args[0],
+			xReadArgs := goredis.XReadArgs{
+				Streams: []string{"indexationFinished", idToCheck},
+				Count:   100,
+				Block:   2 * time.Second,
 			}
-			res, _ := client.XReadGroup(context.Background(), &xReadArgs).Result()
+			res, _ := client.XRead(context.Background(), &xReadArgs).Result()
 
 			// if errXRead != nil {
 			// 	log.Errorln(errXRead)

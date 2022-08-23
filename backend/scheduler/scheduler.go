@@ -1,0 +1,134 @@
+package scheduler
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"time"
+
+	goredis "github.com/go-redis/redis/v8"
+	log "github.com/sirupsen/logrus"
+)
+
+type Scheduler struct {
+	client *goredis.Client
+}
+
+func Create(client *goredis.Client) Scheduler {
+	return Scheduler{
+		client: client,
+	}
+}
+
+func (s *Scheduler) RunScheduleIndexation(callback func()) {
+	indexationFinishedlastIdChecked, _ := s.client.Get(context.Background(), "indexationFinishedLastId").Result()
+	indexationCatchuplastIdChecked, _ := s.client.Get(context.Background(), "indexationCatchupLastId").Result()
+
+	if indexationFinishedlastIdChecked == "" {
+		indexationFinishedlastIdChecked = "0"
+	}
+
+	if indexationCatchuplastIdChecked == "" {
+		indexationCatchuplastIdChecked = "0"
+	}
+
+	log.Infoln("Listen stream for finished indexation")
+	for {
+		xReadArgs := goredis.XReadArgs{
+			Streams: []string{"indexationFinished", "indexationCatchup", indexationFinishedlastIdChecked, indexationCatchuplastIdChecked},
+			Count:   1,
+			Block:   2 * time.Second,
+		}
+		res, _ := s.client.XRead(context.Background(), &xReadArgs).Result()
+
+		if len(res) > 0 && len(res[0].Messages) > 0 {
+			stream := res[0]
+			messages := stream.Messages
+
+			var regionId int
+			for k := range messages[0].Values {
+				if k == "regionId" {
+					switch val := messages[0].Values[k].(type) {
+					case string:
+						v, _ := strconv.Atoi(val)
+						regionId = v
+					}
+				}
+			}
+
+			switch stream.Stream {
+			case "indexationFinished":
+				log.Infof("Schedule region %d", regionId)
+				s.scheduleOrdersScanForRegion(regionId)
+				indexationFinishedlastIdChecked = stream.Messages[0].ID
+				s.client.Set(context.Background(), "indexationFinishedLastId", indexationFinishedlastIdChecked, 0)
+				break
+			case "indexationCatchup":
+				log.Infof("Catchup region %d", regionId)
+				s.scheduleOrdersCatchupForRegion(regionId)
+				indexationCatchuplastIdChecked = stream.Messages[0].ID
+				s.client.Set(context.Background(), "indexationCatchupLastId", indexationCatchuplastIdChecked, 0)
+				break
+			}
+
+		}
+
+		defer callback()
+	}
+}
+
+func (s *Scheduler) scheduleOrdersScanForRegion(regionId int) error {
+	if regionId == 0 {
+		return nil
+	}
+
+	delay := 3600
+	if isRegionSearchDuringInterval(regionId, 5*time.Minute, s.client) {
+		delay = 300
+	} else if isRegionSearchDuringInterval(regionId, 1*time.Hour, s.client) {
+		delay = 600
+	}
+
+	delayedTime := int(time.Now().Unix()) + delay
+
+	s.client.ZAdd(context.Background(), "indexationDelayed", &goredis.Z{Score: float64(delayedTime), Member: regionId})
+
+	return nil
+}
+
+func isRegionSearchDuringInterval(regionId int, timeRange time.Duration, client *goredis.Client) bool {
+	res, _ := client.Do(
+		context.Background(),
+		"TS.RANGE", fmt.Sprintf("regionFetchHistory:%d", regionId), time.Now().Add(-timeRange).UnixMilli(), time.Now().UnixMilli(), "AGGREGATION", "sum", timeRange,
+	).Result()
+
+	count := 0
+	switch val := res.(type) {
+	case []interface{}:
+		for _, el := range val {
+			switch val2 := el.(type) {
+			case []interface{}:
+				for _, el2 := range val2 {
+					switch val3 := el2.(type) {
+					case string:
+						v, _ := strconv.Atoi(val3)
+						count = v
+					}
+				}
+			}
+		}
+	}
+
+	return count > 0
+}
+
+func (s *Scheduler) scheduleOrdersCatchupForRegion(regionId int) error {
+	if regionId == 0 {
+		return nil
+	}
+
+	delayedTime := int(time.Now().Unix()) + 10
+	s.client.ZAdd(context.Background(), "indexationDelayed", &goredis.Z{Score: float64(delayedTime), Member: regionId})
+
+	return nil
+}
