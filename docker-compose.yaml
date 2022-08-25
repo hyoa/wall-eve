@@ -1,0 +1,57 @@
+version: '3.7'
+services:
+  api:
+    container_name: api
+    build:
+      context: ./
+      dockerfile: docker/api/Dockerfile
+    ports:
+      - 1337:1337
+    restart: on-failure
+    env_file:
+      - .env
+  
+  heartbeat:
+    container_name: heartbeat
+    build:
+      context: ./
+      dockerfile: docker/worker/Dockerfile
+      args:
+        - workerName=heartbeat
+    restart: always
+    env_file:
+      - .env
+  
+  delayer:
+    container_name: delayer
+    build:
+      context: ./
+      dockerfile: docker/worker/Dockerfile
+      args:
+        - workerName=delayer
+    restart: always
+    env_file:
+      - .env
+
+  scheduler:
+    container_name: scheduler
+    build:
+      context: ./
+      dockerfile: docker/worker/Dockerfile
+      args:
+        - workerName=scheduler
+    restart: always
+    env_file:
+      - .env
+
+  indexer:
+    container_name: indexer
+    build:
+      context: ./
+      dockerfile: docker/worker/Dockerfile
+      args:
+        - workerName=indexer
+        - cmdExec=run indexer-consumer-1
+    restart: always
+    env_file:
+      - .env
