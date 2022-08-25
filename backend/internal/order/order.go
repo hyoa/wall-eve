@@ -99,7 +99,7 @@ func getNbPages(url string) int {
 	resp, err := http.Head(url)
 
 	if err != nil {
-		fmt.Println("Unable to fetch head: ", url)
+		return 0
 	}
 
 	nbPages, _ := strconv.ParseInt(resp.Header.Get("X-Pages"), 10, 32)

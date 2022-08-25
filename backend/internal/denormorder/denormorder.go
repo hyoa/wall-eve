@@ -39,7 +39,6 @@ type Filter struct {
 
 func GetDenormalizedOrdersWithFilter(filter Filter, client *goredis.Client) ([]DenormalizedOrder, error) {
 	searchParams := createSearchParams(filter)
-	fmt.Println(searchParams)
 	queryParams := fmt.Sprintf(
 		"%s @buyPrice:[%.2f %.2f] @sellPrice:[%.2f %.2f]",
 		searchParams,

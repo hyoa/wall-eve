@@ -61,14 +61,12 @@ func getElementName(typeId int, kind string) (string, error) {
 	resp, errGet := http.Get(url)
 
 	if errGet != nil {
-		fmt.Println(errGet, url)
 		return "", fmt.Errorf("Unable to fetch for url %s: %w", url, errGet)
 	}
 
 	b, errBody := ioutil.ReadAll(resp.Body)
 
 	if errBody != nil {
-		fmt.Println(errGet, url)
 		return "", fmt.Errorf("Unable to fetch for url %s: %w", url, errBody)
 	}
 
@@ -76,7 +74,6 @@ func getElementName(typeId int, kind string) (string, error) {
 	json.Unmarshal(b, &item)
 
 	if item.Name == "" {
-		fmt.Println("error: ", url)
 		return "", fmt.Errorf("No name for url %s", url)
 	}
 
