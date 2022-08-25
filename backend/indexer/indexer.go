@@ -54,7 +54,6 @@ func (i *Indexer) Run(consumerName string) {
 		if len(res) > 0 && len(res[0].Messages) == 1 {
 			stream := res[0]
 			messages := stream.Messages
-			log.Infoln("lenght message: ", len(messages))
 			if checkBackLog && len(messages) == 0 {
 				checkBackLog = false
 			}
@@ -118,6 +117,7 @@ func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
 	extraData["types"] = make(map[int]string)
 
 	log.Infof("Group %d orders by location and type", len(orders))
+
 	for k := range orders {
 		// We avoid players structure, as it require an authentication to get some data.
 		// Not hard to do, but out of the scope :)
@@ -201,8 +201,9 @@ func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
 	}
 
 	log.Infof("Save denormalizedOrders %d", len(denormalizedOrders))
-	denormorder.SaveDenormalizedOrders(denormalizedOrders, i.client)
+	denormorder.SaveDenormalizedOrders(regionId, denormalizedOrders, i.client)
 
+	log.Infoln("Indexation end")
 	return 0, 0, nil
 }
 

@@ -21,8 +21,8 @@ func Create(client *goredis.Client) Scheduler {
 }
 
 func (s *Scheduler) RunScheduleIndexation(callback func()) {
-	indexationFinishedlastIdChecked, _ := s.client.Get(context.Background(), "indexationFinishedLastId").Result()
-	indexationCatchuplastIdChecked, _ := s.client.Get(context.Background(), "indexationCatchupLastId").Result()
+	indexationFinishedlastIdChecked, _ := s.client.Get(context.Background(), "scheduler:indexationFinishedLastId").Result()
+	indexationCatchuplastIdChecked, _ := s.client.Get(context.Background(), "scheduler:indexationCatchupLastId").Result()
 
 	if indexationFinishedlastIdChecked == "" {
 		indexationFinishedlastIdChecked = "0"
@@ -61,13 +61,13 @@ func (s *Scheduler) RunScheduleIndexation(callback func()) {
 				log.Infof("Schedule region %d", regionId)
 				s.scheduleOrdersScanForRegion(regionId)
 				indexationFinishedlastIdChecked = stream.Messages[0].ID
-				s.client.Set(context.Background(), "indexationFinishedLastId", indexationFinishedlastIdChecked, 0)
+				s.client.Set(context.Background(), "scheduler:indexationFinishedLastId", indexationFinishedlastIdChecked, 0)
 				break
 			case "indexationCatchup":
 				log.Infof("Catchup region %d", regionId)
 				s.scheduleOrdersCatchupForRegion(regionId)
 				indexationCatchuplastIdChecked = stream.Messages[0].ID
-				s.client.Set(context.Background(), "indexationCatchupLastId", indexationCatchuplastIdChecked, 0)
+				s.client.Set(context.Background(), "scheduler:indexationCatchupLastId", indexationCatchuplastIdChecked, 0)
 				break
 			}
 

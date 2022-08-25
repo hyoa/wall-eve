@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	goredis "github.com/go-redis/redis/v8"
 	"github.com/nitishm/go-rejson/v4"
@@ -68,7 +69,7 @@ func GetDenormalizedOrdersWithFilter(filter Filter, client *goredis.Client) ([]D
 	return parseSearchOrders(val), nil
 }
 
-func SaveDenormalizedOrders(orders []DenormalizedOrder, client *goredis.Client) error {
+func SaveDenormalizedOrders(regionId int, orders []DenormalizedOrder, client *goredis.Client) error {
 	rh := rejson.NewReJSONHandler()
 	rh.SetGoRedisClient(client)
 
@@ -81,10 +82,11 @@ func SaveDenormalizedOrders(orders []DenormalizedOrder, client *goredis.Client) 
 	for k := range orders {
 		wg.Add(1)
 		task := &taskSaveDenormalizedOrderPayload{
-			wg:    &wg,
-			order: orders[k],
-			err:   false,
-			rh:    rh,
+			wg:     &wg,
+			order:  orders[k],
+			err:    false,
+			rh:     rh,
+			client: client,
 		}
 
 		tasks = append(tasks, task)
@@ -92,6 +94,11 @@ func SaveDenormalizedOrders(orders []DenormalizedOrder, client *goredis.Client) 
 	}
 
 	wg.Wait()
+
+	keys := make([]string, 0)
+	for _, task := range tasks {
+		keys = append(keys, task.key)
+	}
 
 	return nil
 }
@@ -102,10 +109,12 @@ func taskSaveDenormalizedOrderHandler(data interface{}) {
 }
 
 type taskSaveDenormalizedOrderPayload struct {
-	wg    *sync.WaitGroup
-	rh    *rejson.Handler
-	order DenormalizedOrder
-	err   bool
+	wg     *sync.WaitGroup
+	rh     *rejson.Handler
+	client *goredis.Client
+	order  DenormalizedOrder
+	err    bool
+	key    string
 }
 
 func (t *taskSaveDenormalizedOrderPayload) save() {
@@ -115,7 +124,9 @@ func (t *taskSaveDenormalizedOrderPayload) save() {
 	if errSet != nil || res.(string) != "OK" {
 		t.err = true
 	} else {
+		t.client.Expire(context.Background(), key, 24*time.Hour)
 		t.err = false
+		t.key = key
 	}
 
 	t.wg.Done()
@@ -184,4 +195,44 @@ func parseSearchOrders(data interface{}) []DenormalizedOrder {
 	}
 
 	return orders
+}
+
+func RemoveDenormOrdersNotWithTypesIds(regionId int, typesIds []int, client *goredis.Client) error {
+	// redisKey := fmt.Sprintf("orders:%d", regionId)
+	// typesIdsAggregated, _ := client.SMembers(context.Background(), redisKey).Result()
+
+	// typesToRemove := make([]int, 0)
+	// for _, idAggregated := range typesIdsAggregated {
+	// 	v, _ := strconv.Atoi(idAggregated)
+	// 	found := false
+
+	// 	for _, idOnMarket := range typesIds {
+	// 		if v == idOnMarket {
+	// 			found = true
+	// 			break
+	// 		}
+	// 	}
+
+	// 	if !found {
+	// 		typesToRemove = append(typesToRemove, v)
+	// 	}
+	// }
+
+	// // client.SRem(context.Background(), redisKey, typesToRemove)
+	searchParams := make([]string, 0)
+	for _, id := range typesIds {
+		searchParams = append(searchParams, fmt.Sprintf("-@typeId:[%d %d]", id, id))
+	}
+
+	fmt.Println(searchParams)
+
+	keysToRemove, err := client.Do(
+		context.TODO(),
+		"FT.SEARCH", "denormalizedOrdersIdx",
+		fmt.Sprintf("%s", strings.Join(searchParams, " ")),
+	).Result()
+
+	fmt.Println(keysToRemove, err)
+
+	return nil
 }
