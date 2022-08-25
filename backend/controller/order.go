@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v8"
+	"github.com/hyoa/wall-eve/backend/heartbeat"
 	"github.com/hyoa/wall-eve/backend/internal/denormorder"
 )
 
@@ -26,7 +26,8 @@ func (oc *OrderController) GetOrdersWithFilter(ctx *gin.Context) {
 
 	if len(orders) > 0 {
 		regionId := orders[0].RegionId
-		oc.client.Publish(context.Background(), "denormalizedOrdersRegionSearch", regionId)
+		hb := heartbeat.Create(oc.client)
+		hb.SendEvent(regionId)
 	}
 
 	ctx.JSON(http.StatusOK, orders)

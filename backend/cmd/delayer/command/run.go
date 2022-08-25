@@ -16,7 +16,7 @@ func init() {
 
 var checkCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Read stream to delete index data",
+	Short: "Read sorted set to determine if a stream can be created for indexation",
 	Run: func(cmd *cobra.Command, args []string) {
 		var addr = os.Getenv("REDIS_ADDR")
 		client := goredis.NewClient(&goredis.Options{Addr: addr, Username: os.Getenv("REDIS_USER"), Password: os.Getenv("REDIS_PASSWORD")})

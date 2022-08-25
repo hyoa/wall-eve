@@ -3,10 +3,7 @@ package delayercmd
 import "github.com/spf13/cobra"
 
 var (
-	rootCmd = &cobra.Command{
-		Use:   "unindexer",
-		Short: "Run an indexer",
-	}
+	rootCmd = &cobra.Command{}
 )
 
 func Execute() error {

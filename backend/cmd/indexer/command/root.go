@@ -3,10 +3,7 @@ package indexer_cmd
 import "github.com/spf13/cobra"
 
 var (
-	rootCmd = &cobra.Command{
-		Use:   "indexer",
-		Short: "Run an indexer",
-	}
+	rootCmd = &cobra.Command{}
 )
 
 func Execute() error {

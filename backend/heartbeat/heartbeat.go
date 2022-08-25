@@ -21,7 +21,7 @@ func Create(client *goredis.Client) heartbeat {
 }
 
 func (c *heartbeat) Run() {
-	pubsub := c.client.Subscribe(context.Background(), "denormalizedOrdersRegionSearch")
+	pubsub := c.client.Subscribe(context.Background(), "apiHeartbeat")
 
 	defer pubsub.Close()
 
@@ -36,6 +36,10 @@ func (c *heartbeat) Run() {
 		c.catchupRegionIfNeeded(v)
 		c.writeCallHistory(v)
 	}
+}
+
+func (c *heartbeat) SendEvent(data interface{}) {
+	c.client.Publish(context.Background(), "apiHeartbeat", data)
 }
 
 func (c *heartbeat) catchupRegionIfNeeded(regionId int) error {
