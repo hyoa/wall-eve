@@ -7,6 +7,7 @@ import (
 	"time"
 
 	goredis "github.com/go-redis/redis/v8"
+	"github.com/hyoa/wall-eve/backend/internal/extradata"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -78,7 +79,8 @@ func (s *Scheduler) RunScheduleIndexation(callback func()) {
 }
 
 func (s *Scheduler) scheduleOrdersScanForRegion(regionId int) error {
-	if regionId == 0 {
+	if regionId == 0 || !doesRegionExist(regionId, s.client) {
+		log.Errorln("Invalid region")
 		return nil
 	}
 
@@ -123,7 +125,8 @@ func isRegionSearchDuringInterval(regionId int, timeRange time.Duration, client 
 }
 
 func (s *Scheduler) scheduleOrdersCatchupForRegion(regionId int) error {
-	if regionId == 0 {
+	if regionId == 0 || !doesRegionExist(regionId, s.client) {
+		log.Errorln("Invalid region")
 		return nil
 	}
 
@@ -131,4 +134,31 @@ func (s *Scheduler) scheduleOrdersCatchupForRegion(regionId int) error {
 	s.client.ZAdd(context.Background(), "indexationDelayed", &goredis.Z{Score: float64(delayedTime), Member: regionId})
 
 	return nil
+}
+
+func doesRegionExist(regionId int, client *goredis.Client) bool {
+	valValid, _ := client.SIsMember(context.Background(), "validRegions", regionId).Result()
+
+	if valValid {
+		return true
+	}
+
+	valInvalid, errGetFromRedis := client.SIsMember(context.Background(), "invalidRegions", regionId).Result()
+
+	if valInvalid {
+		return false
+	}
+
+	if !valInvalid || errGetFromRedis != nil {
+		name, errGetFromEsi := extradata.GetRegionName(regionId)
+
+		if name == "" || errGetFromEsi != nil {
+			client.SAdd(context.Background(), "invalidRegions", regionId)
+
+			return false
+		}
+	}
+
+	client.SAdd(context.Background(), "validRegions", regionId)
+	return true
 }

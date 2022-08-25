@@ -52,6 +52,10 @@ func FetchExtraData(extraData map[string]map[int]string, client *goredis.Client)
 	return extraData
 }
 
+func GetRegionName(regionId int) (string, error) {
+	return getElementName(regionId, "regions")
+}
+
 func getElementName(typeId int, kind string) (string, error) {
 	url := fmt.Sprintf("https://esi.evetech.net/latest/universe/%s/%d/?datasource=tranquility&language=en", kind, typeId)
 	resp, errGet := http.Get(url)
