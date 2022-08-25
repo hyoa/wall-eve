@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,7 +24,13 @@ func NewOrderController(client *goredis.Client) OrderController {
 
 func (oc *OrderController) GetOrdersWithFilter(ctx *gin.Context) {
 
-	orders, _ := denormorder.GetDenormalizedOrdersWithFilter(createFilter(ctx), oc.client)
+	filter, errFilter := createFilter(ctx)
+
+	if errFilter != nil {
+		ctx.JSON(http.StatusBadRequest, map[string]string{"error": errFilter.Error()})
+	}
+
+	orders, _ := denormorder.GetDenormalizedOrdersWithFilter(filter, oc.client)
 
 	if len(orders) > 0 {
 		regionId := orders[0].RegionId
@@ -34,11 +41,13 @@ func (oc *OrderController) GetOrdersWithFilter(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, orders)
 }
 
-func createFilter(ctx *gin.Context) denormorder.Filter {
+func createFilter(ctx *gin.Context) (denormorder.Filter, error) {
 	var filter denormorder.Filter
 
 	if val := ctx.Query("location"); val != "" {
 		filter.Location = strings.ReplaceAll(val, "-", "")
+	} else {
+		return denormorder.Filter{}, errors.New("query parameter location is mandatory")
 	}
 
 	if val := ctx.Query("typeName"); val != "" {
@@ -73,5 +82,5 @@ func createFilter(ctx *gin.Context) denormorder.Filter {
 		filter.MaxSellPrice = 1000000000000
 	}
 
-	return filter
+	return filter, nil
 }
