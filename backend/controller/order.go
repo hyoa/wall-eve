@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v8"
@@ -36,35 +37,12 @@ func (oc *OrderController) GetOrdersWithFilter(ctx *gin.Context) {
 func createFilter(ctx *gin.Context) denormorder.Filter {
 	var filter denormorder.Filter
 
-	if val := ctx.Query("locationName"); val != "" {
-		filter.LocationName = val
-	}
-
-	if val := ctx.Query("systemName"); val != "" {
-		filter.SystemName = val
-	}
-
-	if val := ctx.Query("regionName"); val != "" {
-		filter.RegionName = val
+	if val := ctx.Query("location"); val != "" {
+		filter.Location = strings.ReplaceAll(val, "-", "")
 	}
 
 	if val := ctx.Query("typeName"); val != "" {
 		filter.TypeName = val
-	}
-
-	if val := ctx.Query("locationId"); val != "" {
-		v, _ := strconv.Atoi(val)
-		filter.LocationId = v
-	}
-
-	if val := ctx.Query("systemId"); val != "" {
-		v, _ := strconv.Atoi(val)
-		filter.SystemId = v
-	}
-
-	if val := ctx.Query("regionId"); val != "" {
-		v, _ := strconv.Atoi(val)
-		filter.RegionId = v
 	}
 
 	if val := ctx.Query("minBuyPrice"); val != "" {

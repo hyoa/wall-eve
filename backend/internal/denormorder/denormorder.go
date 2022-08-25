@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"strconv"
 	"sync"
 	"time"
 
@@ -29,21 +29,17 @@ type DenormalizedOrder struct {
 }
 
 type Filter struct {
-	RegionId     int
-	SystemId     int
-	LocationId   int
 	MinBuyPrice  float64
 	MaxBuyPrice  float64
 	MinSellPrice float64
 	MaxSellPrice float64
-	RegionName   string
-	LocationName string
-	SystemName   string
 	TypeName     string
+	Location     string
 }
 
 func GetDenormalizedOrdersWithFilter(filter Filter, client *goredis.Client) ([]DenormalizedOrder, error) {
 	searchParams := createSearchParams(filter)
+	fmt.Println(searchParams)
 	queryParams := fmt.Sprintf(
 		"%s @buyPrice:[%.2f %.2f] @sellPrice:[%.2f %.2f]",
 		searchParams,
@@ -59,8 +55,6 @@ func GetDenormalizedOrdersWithFilter(filter Filter, client *goredis.Client) ([]D
 		queryParams,
 		"LIMIT", 0, 10000,
 	).Result()
-
-	fmt.Println(queryParams)
 
 	if err != nil {
 		return make([]DenormalizedOrder, 0), err
@@ -133,33 +127,11 @@ func (t *taskSaveDenormalizedOrderPayload) save() {
 }
 
 func createSearchParams(filter Filter) string {
-	searchParamsArray := make([]string, 0)
-
-	if filter.LocationId != 0 {
-		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@locationId:[%d %d]", filter.LocationId, filter.LocationId))
+	if locationInt, err := strconv.Atoi(filter.Location); err == nil {
+		return fmt.Sprintf("@locationId:[%d %d]|@systemId:[%d %d]|@regionId:[%d %d]", locationInt, locationInt, locationInt, locationInt, locationInt, locationInt)
 	}
 
-	if filter.RegionId != 0 {
-		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@regionId:[%d %d]", filter.RegionId, filter.RegionId))
-	}
-
-	if filter.SystemId != 0 {
-		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@systemId:[%d %d]", filter.SystemId, filter.SystemId))
-	}
-
-	if filter.LocationName != "" {
-		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@locationName:(%s)", filter.LocationName))
-	}
-
-	if filter.SystemName != "" {
-		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@systemName:(%s)", filter.SystemName))
-	}
-
-	if filter.RegionName != "" {
-		searchParamsArray = append(searchParamsArray, fmt.Sprintf("@regionName:(%s)", filter.RegionName))
-	}
-
-	return strings.Join(searchParamsArray, " ")
+	return fmt.Sprintf("@locationName:(%s)|@systemName:(%s)|@regionName:(%s)", filter.Location, filter.Location, filter.Location)
 }
 
 func parseSearchOrders(data interface{}) []DenormalizedOrder {
@@ -177,7 +149,6 @@ func parseSearchOrders(data interface{}) []DenormalizedOrder {
 		panic("Wrong element")
 	}
 
-	fmt.Println("-------")
 	for k := range elements {
 		switch val := elements[k].(type) {
 		case []interface{}:
@@ -195,44 +166,4 @@ func parseSearchOrders(data interface{}) []DenormalizedOrder {
 	}
 
 	return orders
-}
-
-func RemoveDenormOrdersNotWithTypesIds(regionId int, typesIds []int, client *goredis.Client) error {
-	// redisKey := fmt.Sprintf("orders:%d", regionId)
-	// typesIdsAggregated, _ := client.SMembers(context.Background(), redisKey).Result()
-
-	// typesToRemove := make([]int, 0)
-	// for _, idAggregated := range typesIdsAggregated {
-	// 	v, _ := strconv.Atoi(idAggregated)
-	// 	found := false
-
-	// 	for _, idOnMarket := range typesIds {
-	// 		if v == idOnMarket {
-	// 			found = true
-	// 			break
-	// 		}
-	// 	}
-
-	// 	if !found {
-	// 		typesToRemove = append(typesToRemove, v)
-	// 	}
-	// }
-
-	// // client.SRem(context.Background(), redisKey, typesToRemove)
-	searchParams := make([]string, 0)
-	for _, id := range typesIds {
-		searchParams = append(searchParams, fmt.Sprintf("-@typeId:[%d %d]", id, id))
-	}
-
-	fmt.Println(searchParams)
-
-	keysToRemove, err := client.Do(
-		context.TODO(),
-		"FT.SEARCH", "denormalizedOrdersIdx",
-		fmt.Sprintf("%s", strings.Join(searchParams, " ")),
-	).Result()
-
-	fmt.Println(keysToRemove, err)
-
-	return nil
 }
