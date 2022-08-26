@@ -66,7 +66,7 @@ func SaveDenormalizedOrders(regionId int, orders []DenormalizedOrder, client *go
 	rh := rejson.NewReJSONHandler()
 	rh.SetGoRedisClient(client)
 
-	pool, _ := ants.NewPoolWithFunc(1000, taskSaveDenormalizedOrderHandler)
+	pool, _ := ants.NewPoolWithFunc(100, taskSaveDenormalizedOrderHandler)
 	defer pool.Release()
 
 	var wg sync.WaitGroup

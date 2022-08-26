@@ -96,7 +96,7 @@ type taskFetchDataPayload struct {
 func (t *taskFetchDataPayload) fetch() {
 	val, errGet := t.client.Get(context.Background(), fmt.Sprintf("%s:%d", t.kind, t.id)).Result()
 
-	if errGet == nil || val == "" {
+	if errGet != nil || val == "" {
 		val, _ = getElementName(t.id, t.kind)
 
 		t.client.Set(context.Background(), fmt.Sprintf("%s:%d", t.kind, t.id), val, 0)

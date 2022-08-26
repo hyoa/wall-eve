@@ -91,6 +91,7 @@ func (i *Indexer) Run(consumerName string) {
 }
 
 func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
+	start := time.Now()
 	log.Infoln("Fetch orders")
 	orders := order.GetOrdersFromEsiForRegion(regionId)
 
@@ -203,7 +204,8 @@ func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
 	log.Infof("Save denormalizedOrders %d", len(denormalizedOrders))
 	denormorder.SaveDenormalizedOrders(regionId, denormalizedOrders, i.client)
 
-	log.Infoln("Indexation end")
+	elapsed := time.Since(start)
+	log.Infof("Indexation end in: %.f seconds", elapsed.Seconds())
 	return 0, 0, nil
 }
 
