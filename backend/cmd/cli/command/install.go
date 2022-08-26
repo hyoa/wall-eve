@@ -10,13 +10,21 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(installCmd)
 }
 
-var checkCmd = &cobra.Command{
+var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Create require informations for redis",
 	Run: func(cmd *cobra.Command, args []string) {
+		if envFile != "" {
+			err := loadEnv()
+
+			if err != nil {
+				return
+			}
+		}
+
 		var addr = os.Getenv("REDIS_ADDR")
 		client := goredis.NewClient(&goredis.Options{Addr: addr, Username: os.Getenv("REDIS_USER"), Password: os.Getenv("REDIS_PASSWORD")})
 

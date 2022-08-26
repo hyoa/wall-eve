@@ -19,6 +19,14 @@ var warmupCmd = &cobra.Command{
 	Short: "Create require informations for redis",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if envFile != "" {
+			err := loadEnv()
+
+			if err != nil {
+				return
+			}
+		}
+
 		var addr = os.Getenv("REDIS_ADDR")
 		client := goredis.NewClient(&goredis.Options{Addr: addr, Username: os.Getenv("REDIS_USER"), Password: os.Getenv("REDIS_PASSWORD")})
 

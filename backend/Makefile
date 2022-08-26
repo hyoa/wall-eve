@@ -12,3 +12,8 @@ test-verbose:
 
 run:
 	air
+
+build-cli:
+	GOOS=windows GOARCH=amd64 go build -o bin/wall-eve-cli.exe cmd/cli/main.go
+	GOOS=darwin GOARCH=amd64 go build -o bin/wall-eve-cli-macos cmd/cli/main.go
+	GOOS=linux GOARCH=amd64 go build -o bin/wall-eve-cli-linux cmd/cli/main.go
