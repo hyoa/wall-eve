@@ -15,7 +15,7 @@ func main() {
 	c := controller.NewOrderController(client)
 
 	r := gin.Default()
-	r.GET("/orders", c.GetOrdersWithFilter)
+	r.GET("/market", c.GetDenormOrdersWithFilter)
 
 	r.Run(":1337")
 }

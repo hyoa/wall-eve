@@ -55,3 +55,12 @@ services:
     restart: always
     env_file:
       - .env
+  
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    ports:
+      - "1338:8080"
+    volumes:
+      - ./swagger/wall-eve.yaml:/swagger/wall-eve.yaml
+    environment:
+      SWAGGER_JSON: /swagger/wall-eve.yaml

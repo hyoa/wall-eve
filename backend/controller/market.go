@@ -12,17 +12,17 @@ import (
 	"github.com/hyoa/wall-eve/backend/internal/denormorder"
 )
 
-type OrderController struct {
+type MarketController struct {
 	client *goredis.Client
 }
 
-func NewOrderController(client *goredis.Client) OrderController {
-	return OrderController{
+func NewOrderController(client *goredis.Client) MarketController {
+	return MarketController{
 		client: client,
 	}
 }
 
-func (oc *OrderController) GetOrdersWithFilter(ctx *gin.Context) {
+func (mc *MarketController) GetDenormOrdersWithFilter(ctx *gin.Context) {
 
 	filter, errFilter := createFilter(ctx)
 
@@ -30,11 +30,11 @@ func (oc *OrderController) GetOrdersWithFilter(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, map[string]string{"error": errFilter.Error()})
 	}
 
-	orders, _ := denormorder.GetDenormalizedOrdersWithFilter(filter, oc.client)
+	orders, _ := denormorder.GetDenormalizedOrdersWithFilter(filter, mc.client)
 
 	if len(orders) > 0 {
 		regionId := orders[0].RegionId
-		hb := heartbeat.Create(oc.client)
+		hb := heartbeat.Create(mc.client)
 		hb.SendEvent(regionId)
 	}
 

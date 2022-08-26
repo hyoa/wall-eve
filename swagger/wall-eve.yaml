@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: Wall-Eve
+  description: |-
+    This is a sample Pet Store Server based on the OpenAPI 3.0 specification
+  version: 0.1.0
+servers:
+  - url: https://127.0.0.1:1337
+tags:
+  - name: market
+    description: Get aggregated data from market
+paths:
+  /market:
+    get:
+      tags:
+        - market
+      summary: Finds market data for a location
+      description: Finds aggregated data for a location
+      parameters:
+        - name: location
+          in: query
+          description: Location to filter on. Can be regionId, systemId, locationId, regionName, systemName, locationName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketItem'          
+        '400':
+          description: Invalid location value
+components:
+  schemas:
+    MarketItem:
+      type: object
+      properties:
+        regionId:
+          type: integer
+          format: int32
+          example: 10000032
+        systemId:
+          type: integer
+          format: int32
+          example: 30002659
+        locationId:
+          type: integer
+          format: int64
+          example: 60011866
+        typeId:
+          type: integer
+          format: int32
+          example: 43694
+        regionName:
+          type: string
+          example: Sinq Laison
+        systemName:
+          type: string
+          example: Dodixie
+        locationName:
+          type: string
+          example: Dodixie IX - Moon 20 - Federation Navy Assembly Plant
+        typeName:
+          type: string
+          example: Augmented' Mining Drone
+        buyPrice:
+          type: number
+          example: 13710000
+        sellPrice:
+          type: number
+          example: 28510000
+          
+          
