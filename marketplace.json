@@ -1,0 +1,21 @@
+{
+    "app_name": "wall-eve",
+    "description": "An API that provide aggregated data for the market of the game Eve Online",
+    "hidden": "true",
+    "rank": 100,
+    "type": "Full App",
+    "contributed_by": "Community",
+    "repo_url": "https://github.com/hyoa/wall-eve",
+    "download_url": "https://github.com/hyoa/wall-eve/archive/refs/heads/main.zip",
+    "hosted_url": "",
+    "language": ["Go"],
+    "redis_commands": ["GET", "SET", "SADD", "SISMEMBER", "XADD", "XREAD", "XREADGROUP", "PUBLISH", "SUBSCRIBE", "ZADD", "ZRANGEWITHSCORE", "ZRANGE", "FT.SEARCH", "JSON.SET", "TS.RANGE", "TS.ADD", "EXPIRE"],
+    "redis_features": ["caching", "stream", "pub/sub", "search", "json", "timeseries"],
+    "redis_modules": ["RedisJSON", "RedisTimeseries"],
+    "app_image_urls": [
+    ],
+    "youtube_url": "",
+    "special_tags": ["Hackathon"],
+    "verticals": ["Others"],
+    "markdown": "https://github.com/hyoa/wall-eve/blob/main/README.md"
+}
