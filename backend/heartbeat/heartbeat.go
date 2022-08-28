@@ -21,11 +21,11 @@ func Create(client *goredis.Client) heartbeat {
 }
 
 func (c *heartbeat) Run() {
-	pubsub := c.client.Subscribe(context.Background(), "apiHeartbeat")
+	pubsub := c.client.Subscribe(context.Background(), "apiEvent")
 
 	defer pubsub.Close()
 
-	log.Info("Listen for region to catchup")
+	log.Info("Listen for region access")
 	for {
 		msg, err := pubsub.ReceiveMessage(context.Background())
 		if err != nil {
@@ -33,46 +33,9 @@ func (c *heartbeat) Run() {
 		}
 
 		v, _ := strconv.Atoi(msg.Payload)
-		c.catchupRegionIfNeeded(v)
+		log.Infof("Write access for %d", v)
 		c.writeCallHistory(v)
 	}
-}
-
-func (c *heartbeat) SendEvent(data interface{}) {
-	c.client.Publish(context.Background(), "apiHeartbeat", data)
-}
-
-func (c *heartbeat) catchupRegionIfNeeded(regionId int) error {
-	key := fmt.Sprintf("indexationCatchupLaunch:%d", regionId)
-	v, err := c.client.Get(context.Background(), key).Result()
-
-	if (err != nil && err.Error() != "redis: nil") || v == "1" {
-		return nil
-	}
-
-	now := time.Now().Unix()
-	res, _ := c.client.ZRangeByScore(
-		context.Background(),
-		"indexationDelayed",
-		&goredis.ZRangeBy{
-			Min: fmt.Sprintf("%d", now),
-			Max: fmt.Sprintf("%d", now+300),
-		},
-	).Result()
-
-	if len(res) == 0 {
-		args := goredis.XAddArgs{
-			Stream: "indexationCatchup",
-			Values: []interface{}{"regionId", regionId},
-		}
-
-		log.Infof("Ask to catchup %d", regionId)
-
-		c.client.XAdd(context.Background(), &args)
-		c.client.Set(context.Background(), key, true, time.Minute)
-	}
-
-	return nil
 }
 
 func (c *heartbeat) writeCallHistory(regionId int) error {

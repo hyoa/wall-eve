@@ -183,7 +183,7 @@ Aggregate and store the data
 
   
 
-Subscribe to a pub/sub to store access count to a region and determine if a catchup is needed
+Subscribe to a pub/sub to store access count to a region
 
   
 
@@ -195,13 +195,35 @@ Subscribe to a pub/sub to store access count to a region and determine if a catc
 
   
 
+#### How the data is accessed:
+
+  
+
+* Subscribe to event publish: `SUBSCRIBE apiEvent`
+
+
+### Refresh
+
+  
+
+Subscribe to a pub/sub to determine if a catchup is needed
+
+  
+
+#### How the data is stored:
+  
+
 * Send an event to a stream if a catchup is required: `XADD indexationCatchup * regionId {regionId}`
+
+* Store the catchup request for 5 minutes: `SET indexationCatchupLaunch:{regionId} 300`
 
   
 
 #### How the data is accessed:
 
-  
+* Subscribe to event publish: `SUBSCRIBE apiEvent`
+
+* Check if a catchup has been request in the last 5 minutes: `GET indexationCatchupLaunch:{regionId} 300`
 
 * Check in the queued task for the next 5 minutes if the regionId is scheduled: `ZRANGEBYSCORE indexationDelayed {now} {now+5minutes}`
 
@@ -231,7 +253,7 @@ Provide aggregated data to end user
 
   
 
-	eg:
+	eg (with location as string):
 
 ```
 
@@ -239,7 +261,39 @@ FT.SEARCH denormalizedOrdersIdx @locationName:(Dodixie IX Moon 20)|@systemName:(
 
 ```
 
-  
+	eg (with location as id):
+
+```
+FT.SEARCH denormalizedOrdersIdx @locationIdsTag:{60011866} @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000] LIMIT 0 10000
+```
+
+### CLI
+
+Provide a CLI tool to interact with Redis for installation and warming up the application
+
+* Creation of the index
+
+```
+FT.CREATE denormalizedOrdersIx
+    ON JSON
+    PREFIX 1 denormalizedOrders:
+    SCHEMA
+        $.regionId AS regionId NUMERIC
+        $.systemId AS systemId NUMERIC
+        $.locationId AS locationId NUMERIC
+        $.typeId AS typeId NUMERIC
+        $.buyPrice AS buyPrice NUMERIC
+        $.sellPrice AS sellPrice NUMERIC
+        $.buyVolume AS buyVolume NUMERIC
+        $.sellVolume AS sellVolume NUMERIC
+        $.locationName AS locationName TEXT
+        $.systemName AS systemName TEXT
+        $.regionName AS regionName TEXT
+        $.typeName AS typeName TEXT
+        $.locationIdTags AS locationIdTags TAG SEPARATOR ","
+```
+
+* Creation of the group stream (and creating the stream in same time) `XGROUP CREATE indexationAdd indexationAddGroup 0 MKSTREAM`
 
 ## How to run it locally?
   

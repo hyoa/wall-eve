@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v8"
-	"github.com/hyoa/wall-eve/backend/heartbeat"
 	"github.com/hyoa/wall-eve/backend/internal/denormorder"
 )
 
@@ -34,8 +34,7 @@ func (mc *MarketController) GetDenormOrdersWithFilter(ctx *gin.Context) {
 
 	if len(orders) > 0 {
 		regionId := orders[0].RegionId
-		hb := heartbeat.Create(mc.client)
-		hb.SendEvent(regionId)
+		mc.client.Publish(context.Background(), "apiEvent", regionId)
 	}
 
 	ctx.JSON(http.StatusOK, orders)

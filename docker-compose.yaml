@@ -43,15 +43,38 @@ services:
     restart: always
     env_file:
       - .env
+  
+  refresh:
+    container_name: refresh
+    build:
+      context: ./
+      dockerfile: docker/worker/Dockerfile
+      args:
+        - workerName=refresh
+    restart: always
+    env_file:
+      - .env
 
-  indexer:
-    container_name: indexer
+  indexer-1:
+    container_name: indexer-1
     build:
       context: ./
       dockerfile: docker/worker/Dockerfile
       args:
         - workerName=indexer
         - cmdExec=run indexer-consumer-1
+    restart: always
+    env_file:
+      - .env
+    
+  indexer-2:
+    container_name: indexer-2
+    build:
+      context: ./
+      dockerfile: docker/worker/Dockerfile
+      args:
+        - workerName=indexer
+        - cmdExec=run indexer-consumer-2
     restart: always
     env_file:
       - .env

@@ -175,8 +175,6 @@ func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
 	for k := range ordersMapped {
 		sort.Float64s(ordersMapped[k].buyPrices)
 		sort.Float64s(ordersMapped[k].sellPrices)
-		sort.Ints(ordersMapped[k].buyVolumes)
-		sort.Ints(ordersMapped[k].sellVolumes)
 
 		var maxBuyPrice float64
 		if len(ordersMapped[k].buyPrices) > 0 {
@@ -185,6 +183,16 @@ func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
 		var minSellPrice float64
 		if len(ordersMapped[k].sellPrices) > 0 {
 			minSellPrice = ordersMapped[k].sellPrices[0]
+		}
+
+		totalBuyVolume := 0
+		for _, n := range ordersMapped[k].buyVolumes {
+			totalBuyVolume += n
+		}
+
+		totalSellVolume := 0
+		for _, n := range ordersMapped[k].sellVolumes {
+			totalSellVolume += n
 		}
 
 		denormalizedOrders = append(denormalizedOrders, denormorder.DenormalizedOrder{
@@ -198,6 +206,8 @@ func (i *Indexer) indexOrdersInRegion(regionId int) (int, int, error) {
 			SystemName:   extraDataWithName["systems"][ordersMapped[k].systemId],
 			RegionName:   extraDataWithName["regions"][ordersMapped[k].regionId],
 			TypeName:     extraDataWithName["types"][int(k.typeId)],
+			BuyVolume:    totalBuyVolume,
+			SellVolume:   totalSellVolume,
 		})
 	}
 

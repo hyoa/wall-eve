@@ -13,6 +13,22 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
+type DenormalizedOrderRedis struct {
+	RegionId       int     `json:"regionId"`
+	SystemId       int     `json:"systemId"`
+	LocationId     int     `json:"locationId"`
+	TypeId         int     `json:"typeId"`
+	RegionName     string  `json:"regionName"`
+	SystemName     string  `json:"systemName"`
+	LocationName   string  `json:"locationName"`
+	TypeName       string  `json:"typeName"`
+	BuyPrice       float64 `json:"buyPrice"`
+	SellPrice      float64 `json:"sellPrice"`
+	BuyVolume      int     `json:"buyVolume"`
+	SellVolume     int     `json:"sellVolume"`
+	LocationIdTags string  `json:"locationIdTags"`
+}
+
 type DenormalizedOrder struct {
 	RegionId     int     `json:"regionId"`
 	SystemId     int     `json:"systemId"`
@@ -74,6 +90,7 @@ func SaveDenormalizedOrders(regionId int, orders []DenormalizedOrder, client *go
 
 	for k := range orders {
 		wg.Add(1)
+
 		task := &taskSaveDenormalizedOrderPayload{
 			wg:     &wg,
 			order:  orders[k],
@@ -112,7 +129,24 @@ type taskSaveDenormalizedOrderPayload struct {
 
 func (t *taskSaveDenormalizedOrderPayload) save() {
 	key := fmt.Sprintf("denormalizedOrders:%d:%d", t.order.LocationId, t.order.TypeId)
-	res, errSet := t.rh.JSONSet(key, ".", t.order)
+
+	denormOrderRedis := DenormalizedOrderRedis{
+		RegionId:       t.order.RegionId,
+		SystemId:       t.order.SystemId,
+		LocationId:     t.order.LocationId,
+		TypeId:         t.order.TypeId,
+		RegionName:     t.order.RegionName,
+		SystemName:     t.order.SystemName,
+		LocationName:   t.order.LocationName,
+		TypeName:       t.order.TypeName,
+		BuyPrice:       t.order.BuyPrice,
+		SellPrice:      t.order.SellPrice,
+		BuyVolume:      t.order.BuyVolume,
+		SellVolume:     t.order.SellVolume,
+		LocationIdTags: fmt.Sprintf("%d, %d, %d", t.order.RegionId, t.order.SystemId, t.order.LocationId),
+	}
+
+	res, errSet := t.rh.JSONSet(key, ".", denormOrderRedis)
 
 	if errSet != nil || res.(string) != "OK" {
 		t.err = true
@@ -127,14 +161,14 @@ func (t *taskSaveDenormalizedOrderPayload) save() {
 
 func createSearchParams(filter Filter) string {
 	if locationInt, err := strconv.Atoi(filter.Location); err == nil {
-		return fmt.Sprintf("@locationId:[%d %d]|@systemId:[%d %d]|@regionId:[%d %d]", locationInt, locationInt, locationInt, locationInt, locationInt, locationInt)
+		return fmt.Sprintf("@locationIdTags:{%d}", locationInt)
 	}
 
 	return fmt.Sprintf("@locationName:(%s)|@systemName:(%s)|@regionName:(%s)", filter.Location, filter.Location, filter.Location)
 }
 
 func parseSearchOrders(data interface{}) []DenormalizedOrder {
-	orders := make([]DenormalizedOrder, 0)
+	orders := make([]DenormalizedOrderRedis, 0)
 
 	elements := make([]interface{}, 0)
 
@@ -155,7 +189,7 @@ func parseSearchOrders(data interface{}) []DenormalizedOrder {
 				switch val2 := val[k2].(type) {
 				case string:
 					if val2 != "$" {
-						var denormalizedOrderRedis DenormalizedOrder
+						var denormalizedOrderRedis DenormalizedOrderRedis
 						json.Unmarshal([]byte(val2), &denormalizedOrderRedis)
 						orders = append(orders, denormalizedOrderRedis)
 					}
@@ -164,5 +198,23 @@ func parseSearchOrders(data interface{}) []DenormalizedOrder {
 		}
 	}
 
-	return orders
+	denormOrders := make([]DenormalizedOrder, 0)
+	for k := range orders {
+		denormOrders = append(denormOrders, DenormalizedOrder{
+			RegionId:     orders[k].RegionId,
+			SystemId:     orders[k].SystemId,
+			LocationId:   orders[k].LocationId,
+			TypeId:       orders[k].TypeId,
+			RegionName:   orders[k].RegionName,
+			SystemName:   orders[k].SystemName,
+			LocationName: orders[k].LocationName,
+			TypeName:     orders[k].TypeName,
+			BuyPrice:     orders[k].BuyPrice,
+			SellPrice:    orders[k].SellPrice,
+			BuyVolume:    orders[k].BuyVolume,
+			SellVolume:   orders[k].SellVolume,
+		})
+	}
+
+	return denormOrders
 }

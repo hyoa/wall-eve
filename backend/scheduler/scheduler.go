@@ -130,8 +130,11 @@ func (s *Scheduler) scheduleOrdersCatchupForRegion(regionId int) error {
 		return nil
 	}
 
-	delayedTime := int(time.Now().Unix()) + 10
-	s.client.ZAdd(context.Background(), "indexationDelayed", &goredis.Z{Score: float64(delayedTime), Member: regionId})
+	xAddArgs := goredis.XAddArgs{
+		Stream: "indexationAdd",
+		Values: []interface{}{"regionId", regionId},
+	}
+	s.client.XAdd(context.Background(), &xAddArgs)
 
 	return nil
 }
