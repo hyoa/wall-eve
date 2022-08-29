@@ -163,7 +163,7 @@ func (t *taskSaveDenormalizedOrderPayload) save() {
 
 func createSearchParams(filter Filter) string {
 	if locationInt, err := strconv.Atoi(filter.Location); err == nil {
-		return fmt.Sprintf("@locationTags:{%d}", locationInt)
+		return fmt.Sprintf("@locationIdTags:{%d}", locationInt)
 	}
 
 	return fmt.Sprintf("@locationNameConcat:(%s)", filter.Location)

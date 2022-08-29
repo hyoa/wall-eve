@@ -271,7 +271,7 @@ Provide a CLI tool to interact with Redis for installation and warming up the ap
 * Creation of the index
 
 ```
-FT.CREATE denormalizedOrdersIx
+FT.CREATE denormalizedOrdersIdx
     ON JSON
     PREFIX 1 denormalizedOrders:
     SCHEMA
@@ -334,7 +334,7 @@ FT.CREATE denormalizedOrdersIx
 Run the following commands:
 
 ```
-FT.CREATE denormalizedOrdersIx
+FT.CREATE denormalizedOrdersIdx
     ON JSON
     PREFIX 1 denormalizedOrders:
     SCHEMA
