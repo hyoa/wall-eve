@@ -299,8 +299,8 @@ FT.CREATE denormalizedOrdersIx
 
 * Docker & Docker-composer
 * Internet connection
-* GO 1.18 if you cannot use the cli provided in the release
-  
+* GO 1.18 (in case you cannot run one of the binary file)
+* Not doing it between 11:00UTC and 11:30UTC (there is a maintenance on the game that shutdown their API)
 
 ### Local installation
 
@@ -309,32 +309,68 @@ FT.CREATE denormalizedOrdersIx
 * Change `.env.dist` to `.env.local` (change password if you changed it in the step before)
 * Run `docker-compose up` 
 * Use one of the executable in the release [link to release] and run the following commands:
-	* Run `wall-eve-cli-{youros} install --envFile=.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=.env.local`
+	* Run `wall-eve-cli-{youros} install --envFile=$path/.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=$path/.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=$path/.env.local`
 
-#### 2. With redis from not docker-compose
+#### 2. With redis from not docker-compose (you need a least 500mb of memory)
 * Change `.env.dist` to `.env.local` and change the value using your own redis address (don't forget to add the port at the end of the address `{adress}:{port}`)
-* Run `docker-compose -f docker-compose-noredis.yaml up` 
+* Run `docker-compose -f docker-compose-no-redis.yaml up` 
 * Use one of the executable in the release [link to release] and run the following commands:
-	* Run `wall-eve-cli-{youros} install --envFile=.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=.env.local`
+	* Run `wall-eve-cli-{youros} install --envFile=$path/.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=$path/.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=$path/.env.local`
 
-**If you cannot run one of the binary, you can follow the following step (it requires go 1.18 installed)s**
-* `cd backend`
-* `go mod download`
-* `go run cmd/cli/main.go install --env=.env.local`
-* `cd backend && go run cmd/cli/main.go warmup 10000032 --env=.env.local`
-* `cd backend && go run cmd/cli/main.go warmup 10000002 --env=.env.local`
+**If you cannot run one of the binary, you can follow one of the 2 options below**
+#####1. With go 1.18 installed
+	* `cd backend`
+	* `go mod download`
+	* `go run cmd/cli/main.go install --env=$path/.env.local`
+	* `cd backend && go run cmd/cli/main.go warmup 10000032 --env=$path/.env.local`
+	* `cd backend && go run cmd/cli/main.go warmup 10000002 --env=$path/.env.local`
+
+######2. Without go but an access to the redis cli
+Run the following commands:
+
+```
+FT.CREATE denormalizedOrdersIx
+    ON JSON
+    PREFIX 1 denormalizedOrders:
+    SCHEMA
+        $.regionId AS regionId NUMERIC
+        $.systemId AS systemId NUMERIC
+        $.locationId AS locationId NUMERIC
+        $.typeId AS typeId NUMERIC
+        $.buyPrice AS buyPrice NUMERIC
+        $.sellPrice AS sellPrice NUMERIC
+        $.buyVolume AS buyVolume NUMERIC
+        $.sellVolume AS sellVolume NUMERIC
+        $.locationName AS locationName TEXT
+        $.systemName AS systemName TEXT
+        $.regionName AS regionName TEXT
+        $.typeName AS typeName TEXT
+        $.locationIdTags AS locationIdTags TAG SEPARATOR ","
+```
+
+```
+XGROUP CREATE indexationAdd indexationAddGroup 0 MKSTREAM
+```
+
+```
+XADD indexationAdd * regionId 10000032
+XADD indexationAdd * regionId 10000002
+```
+
 
 It can take 2-3 minutes before the first entries are saved into the application
 
 You can access the API at `http://127.0.0.1:1337`
 You can find the swagger at `http://127.0.0.1:1338`
 
-If you are not familiar with Eve online, you can find below some query parameters to use with the API
+If you are not familiar with Eve Online, you can find below some query parameters to use with the API:
 
-## Deployment
+```
+minBuyPrice, maxBuyPrice, minSellPrice, maxSellPrice => between 1 and 2000000000 (sellPrice must be higher than buyPrice)
+location => jita, dodixie, sinq, dodixie moon 9, caldari, iv moon 4, perimeter, 30000144, 60004423, 30000142
 
-To make deploys work, you need to create free account on [Redis Cloud](https://redis.info/try-free-dev-to)
+If you are familiar with Eve Online, we only imported data for The Forge and Sinq Laison. You can add more regions using the warmup command with the id of the region you want.
