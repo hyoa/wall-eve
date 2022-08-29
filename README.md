@@ -37,7 +37,7 @@ Here's a short video that explains the project and how it uses Redis:
 
   
 
-Check on dev.to to have a detailed post on how works the project.
+Check on [dev.to](https://dev.to/hyoa/wall-eve-5cbp) to have a detailed post on how works the project.
 
   
 
