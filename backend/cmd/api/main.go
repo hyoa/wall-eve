@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	goredis "github.com/go-redis/redis/v8"
 	"github.com/hyoa/wall-eve/backend/controller"
@@ -15,6 +16,7 @@ func main() {
 	c := controller.NewOrderController(client)
 
 	r := gin.Default()
+	r.Use(cors.Default())
 	r.GET("/market", c.GetDenormOrdersWithFilter)
 
 	r.Run(":1337")
