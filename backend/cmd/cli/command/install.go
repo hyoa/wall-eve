@@ -45,7 +45,8 @@ var installCmd = &cobra.Command{
 			"$.regionName", "AS", "regionName", "TEXT",
 			"$.systemName", "AS", "systemName", "TEXT",
 			"$.typeName", "AS", "typeName", "TEXT",
-			"$.locationIdTags", "AS", "locationIdTags", "TAG", "SEPARATOR", ",",
+			"$.locationNameConcat", "AS", "locationNameConcat", "TEXT",
+			"$.locationTags", "AS", "locationTags", "TAG", "SEPARATOR", ",",
 		).Result()
 
 		if errCreateIdx != nil {

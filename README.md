@@ -256,7 +256,7 @@ Provide aggregated data to end user
 eg (with location as string):
 
 
-FT.SEARCH denormalizedOrdersIdx "@locationName:(Dodixie IX Moon 20)|@systemName:(Dodixie IX Moon 20)|@regionName:(Dodixie IX Moon 20) @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000]" LIMIT 0 10000
+FT.SEARCH denormalizedOrdersIdx "@locationNameConcat:(Dodixie IX Moon 20) @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000]" LIMIT 0 10000
 
 
 eg (with location as id):
@@ -287,6 +287,7 @@ FT.CREATE denormalizedOrdersIx
         $.systemName AS systemName TEXT
         $.regionName AS regionName TEXT
         $.typeName AS typeName TEXT
+        $.locationNameConcat AS locationNameConcat TEXT
         $.locationIdTags AS locationIdTags TAG SEPARATOR ","
 ```
 
@@ -349,6 +350,7 @@ FT.CREATE denormalizedOrdersIx
         $.systemName AS systemName TEXT
         $.regionName AS regionName TEXT
         $.typeName AS typeName TEXT
+        $.locationNameConcat AS locationNameConcat TEXT
         $.locationIdTags AS locationIdTags TAG SEPARATOR ","
 ```
 

@@ -14,19 +14,20 @@ import (
 )
 
 type DenormalizedOrderRedis struct {
-	RegionId       int     `json:"regionId"`
-	SystemId       int     `json:"systemId"`
-	LocationId     int     `json:"locationId"`
-	TypeId         int     `json:"typeId"`
-	RegionName     string  `json:"regionName"`
-	SystemName     string  `json:"systemName"`
-	LocationName   string  `json:"locationName"`
-	TypeName       string  `json:"typeName"`
-	BuyPrice       float64 `json:"buyPrice"`
-	SellPrice      float64 `json:"sellPrice"`
-	BuyVolume      int     `json:"buyVolume"`
-	SellVolume     int     `json:"sellVolume"`
-	LocationIdTags string  `json:"locationIdTags"`
+	RegionId           int     `json:"regionId"`
+	SystemId           int     `json:"systemId"`
+	LocationId         int     `json:"locationId"`
+	TypeId             int     `json:"typeId"`
+	RegionName         string  `json:"regionName"`
+	SystemName         string  `json:"systemName"`
+	LocationName       string  `json:"locationName"`
+	TypeName           string  `json:"typeName"`
+	BuyPrice           float64 `json:"buyPrice"`
+	SellPrice          float64 `json:"sellPrice"`
+	BuyVolume          int     `json:"buyVolume"`
+	SellVolume         int     `json:"sellVolume"`
+	LocationIdTags     string  `json:"locationIdTags"`
+	LocationNameConcat string  `json:"locationNameConcat"`
 }
 
 type DenormalizedOrder struct {
@@ -131,19 +132,20 @@ func (t *taskSaveDenormalizedOrderPayload) save() {
 	key := fmt.Sprintf("denormalizedOrders:%d:%d", t.order.LocationId, t.order.TypeId)
 
 	denormOrderRedis := DenormalizedOrderRedis{
-		RegionId:       t.order.RegionId,
-		SystemId:       t.order.SystemId,
-		LocationId:     t.order.LocationId,
-		TypeId:         t.order.TypeId,
-		RegionName:     t.order.RegionName,
-		SystemName:     t.order.SystemName,
-		LocationName:   t.order.LocationName,
-		TypeName:       t.order.TypeName,
-		BuyPrice:       t.order.BuyPrice,
-		SellPrice:      t.order.SellPrice,
-		BuyVolume:      t.order.BuyVolume,
-		SellVolume:     t.order.SellVolume,
-		LocationIdTags: fmt.Sprintf("%d, %d, %d", t.order.RegionId, t.order.SystemId, t.order.LocationId),
+		RegionId:           t.order.RegionId,
+		SystemId:           t.order.SystemId,
+		LocationId:         t.order.LocationId,
+		TypeId:             t.order.TypeId,
+		RegionName:         t.order.RegionName,
+		SystemName:         t.order.SystemName,
+		LocationName:       t.order.LocationName,
+		TypeName:           t.order.TypeName,
+		BuyPrice:           t.order.BuyPrice,
+		SellPrice:          t.order.SellPrice,
+		BuyVolume:          t.order.BuyVolume,
+		SellVolume:         t.order.SellVolume,
+		LocationIdTags:     fmt.Sprintf("%d, %d, %d", t.order.RegionId, t.order.SystemId, t.order.LocationId),
+		LocationNameConcat: fmt.Sprintf("%s, %s, %s", t.order.RegionName, t.order.SystemName, t.order.LocationName),
 	}
 
 	res, errSet := t.rh.JSONSet(key, ".", denormOrderRedis)
@@ -161,10 +163,10 @@ func (t *taskSaveDenormalizedOrderPayload) save() {
 
 func createSearchParams(filter Filter) string {
 	if locationInt, err := strconv.Atoi(filter.Location); err == nil {
-		return fmt.Sprintf("@locationIdTags:{%d}", locationInt)
+		return fmt.Sprintf("@locationTags:{%d}", locationInt)
 	}
 
-	return fmt.Sprintf("@locationName:(%s)|@systemName:(%s)|@regionName:(%s)", filter.Location, filter.Location, filter.Location)
+	return fmt.Sprintf("@locationNameConcat:(%s)", filter.Location)
 }
 
 func parseSearchOrders(data interface{}) []DenormalizedOrder {
