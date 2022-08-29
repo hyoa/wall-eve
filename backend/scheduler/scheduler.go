@@ -121,7 +121,6 @@ func isRegionSearchDuringInterval(regionId int, timeStart int, timeWindow int, c
 		}
 	}
 
-	fmt.Println(res)
 	return count > 0
 }
 
