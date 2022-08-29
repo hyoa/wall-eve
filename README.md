@@ -367,6 +367,8 @@ It can take 2-3 minutes before the first entries are saved into the application
 You can access the API at `http://127.0.0.1:1337`
 You can find the swagger at `http://127.0.0.1:1338`
 
+eg: `http://127.0.0.1:1337/market?minBuyPrice=5000000&maxSellPrice=70000000&location=caldari`
+
 If you are not familiar with Eve Online, you can find below some query parameters to use with the API:
 
 ```
