@@ -23,6 +23,30 @@ paths:
           required: true
           schema:
             type: string
+        - name: minBuyPrice
+          in: query
+          description: Minimum value for buy orders price
+          required: false
+          schema:
+            type: number
+        - name: maxBuyPrice
+          in: query
+          description: Maximum value for buy orders price
+          required: false
+          schema:
+            type: number
+        - name: minSellPrice
+          in: query
+          description: Minimum value for sell orders price
+          required: false
+          schema:
+            type: number
+        - name: maxSellPrice
+          in: query
+          description: Maximum value for buy orders price
+          required: false
+          schema:
+            type: number
       responses:
         '200':
           description: successful operation
@@ -73,5 +97,11 @@ components:
         sellPrice:
           type: number
           example: 28510000
+        buyVolume:
+          type: number
+          example: 1
+        sellVolume:
+          type: number
+          example: 10
           
           

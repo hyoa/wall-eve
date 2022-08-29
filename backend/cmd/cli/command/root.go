@@ -13,7 +13,6 @@ var (
 )
 
 func Execute() error {
-	installCmd.Flags().StringVarP((&envFile), "envFile", "e", "", "env file location")
 	return rootCmd.Execute()
 }
 

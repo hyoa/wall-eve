@@ -11,7 +11,7 @@
     "language": ["Go"],
     "redis_commands": ["GET", "SET", "SADD", "SISMEMBER", "XADD", "XREAD", "XREADGROUP", "PUBLISH", "SUBSCRIBE", "ZADD", "ZRANGEWITHSCORE", "ZRANGE", "FT.SEARCH", "JSON.SET", "TS.RANGE", "TS.ADD", "EXPIRE"],
     "redis_features": ["caching", "stream", "pub/sub", "search", "json", "timeseries"],
-    "redis_modules": ["RedisJSON", "RedisTimeseries"],
+    "redis_modules": ["RedisJSON", "RedisTimeseries", "RediSearch"],
     "app_image_urls": [
     ],
     "youtube_url": "",

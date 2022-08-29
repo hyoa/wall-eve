@@ -11,6 +11,7 @@ import (
 )
 
 func init() {
+	warmupCmd.Flags().StringVarP((&envFile), "envFile", "e", "", "env file location")
 	rootCmd.AddCommand(warmupCmd)
 }
 

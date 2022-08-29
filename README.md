@@ -11,14 +11,14 @@ Eve-Online is a MMORPG where trading is an important aspect of the game. The dev
 
   
 
-Wall-Eve is a possible solution to this problem. It aggregate the data and let people retrieve informations using the API.
+Wall-Eve is a possible solution to this problem. It aggregate the data and let people retrieve informations using the API exposed by this application. They even can filter using some query parameters.
 
 The application will refresh the data regurarly to provide up-to-data informations.
 
   
   
 
-[Insert app screenshots](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#uploading-assets)
+![A schema of the application](dist/archi.png.jpg?raw=true "Application")
 
   
 
@@ -303,7 +303,7 @@ FT.CREATE denormalizedOrdersIx
 * Docker & Docker-composer
 * GO 1.18
 * Internet connection
-* A remote redis server with at least 200MB memory
+* A remote redis server with at least 500MB memory and the following modules: RediSearch, RedisJson, RedisTimeseries
   
 
 ### Local installation
@@ -324,7 +324,10 @@ The process will now start and pull the data
 * `cd .. & docker-compose up`
 * `cd backend && go run cmd/cli/main.go warmup 10000032 --env=$pathToYourEnvFile`
 
-You can access the API on `http://127.0.0.1:1337`
+It can take 2-3 minutes before the first entries are saved into the application
+
+You can access the API at `http://127.0.0.1:1337`
+You can find the swagger at `http://127.0.0.1:1338`
 
 If you are not familiar with Eve online, you can find below some query parameters to use with the API
 

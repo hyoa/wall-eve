@@ -10,6 +10,7 @@ import (
 )
 
 func init() {
+	installCmd.Flags().StringVarP((&envFile), "envFile", "e", "", "env file location")
 	rootCmd.AddCommand(installCmd)
 }
 
