@@ -85,9 +85,9 @@ func (s *Scheduler) scheduleOrdersScanForRegion(regionId int) error {
 	}
 
 	delay := 3600
-	if isRegionSearchDuringInterval(regionId, 5*time.Minute, s.client) {
+	if isRegionSearchDuringInterval(regionId, int(time.Now().Add(-5*time.Minute).UnixMilli()), 300000, s.client) {
 		delay = 300
-	} else if isRegionSearchDuringInterval(regionId, 1*time.Hour, s.client) {
+	} else if isRegionSearchDuringInterval(regionId, int(time.Now().Add(-1*time.Hour).UnixMilli()), 3600000, s.client) {
 		delay = 600
 	}
 
@@ -98,10 +98,10 @@ func (s *Scheduler) scheduleOrdersScanForRegion(regionId int) error {
 	return nil
 }
 
-func isRegionSearchDuringInterval(regionId int, timeRange time.Duration, client *goredis.Client) bool {
+func isRegionSearchDuringInterval(regionId int, timeStart int, timeWindow int, client *goredis.Client) bool {
 	res, _ := client.Do(
 		context.Background(),
-		"TS.RANGE", fmt.Sprintf("regionFetchHistory:%d", regionId), time.Now().Add(-timeRange).UnixMilli(), time.Now().UnixMilli(), "AGGREGATION", "sum", timeRange,
+		"TS.RANGE", fmt.Sprintf("regionFetchHistory:%d", regionId), timeStart, "+", "AGGREGATION", "sum", timeWindow,
 	).Result()
 
 	count := 0
@@ -121,6 +121,7 @@ func isRegionSearchDuringInterval(regionId int, timeRange time.Duration, client 
 		}
 	}
 
+	fmt.Println(res)
 	return count > 0
 }
 

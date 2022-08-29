@@ -98,9 +98,9 @@ Add task to a queue with a timestamp. Determine the timestamp by looking at the 
 
 * It calculate the timestamp for the task using timeseries data:
 
-	* `TS.RANGE regionFetchHistory:{regionId} {now-5minutes} {now} AGGREGATION sum 5 minutes`
+	* `TS.RANGE regionFetchHistory:{regionId} {now-5minutes as milliseconds} {now as milliseconds} AGGREGATION sum 300000`
 
-	* `TS.RANGE regionFetchHistory:{regionId} {now-1hours} {now} AGGREGATION sum 1 hours`
+	* `TS.RANGE regionFetchHistory:{regionId} {now-1hours as milliseconds} {now as milliseconds} AGGREGATION sum 3600000`
 
   
   
