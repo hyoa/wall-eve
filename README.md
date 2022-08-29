@@ -42,7 +42,7 @@ Here's a short video that explains the project and how it uses Redis:
 
   
 
-Check on dev.to to have a detailled post on how works the project.
+Check on dev.to to have a detailed post on how works the project.
 
   
 
@@ -60,7 +60,7 @@ Add task to a queue with a timestamp. Determine the timestamp by looking at the 
 
 * Store if an region exist or not:
 
-	* If it exist: `SADD validRegions {regionName}`
+	* If it exists: `SADD validRegions {regionName}`
 
 	* If it does not exist: `SADD invalidRegions {regionName}`
 
@@ -68,7 +68,7 @@ Add task to a queue with a timestamp. Determine the timestamp by looking at the 
 
 * Add the task to a sorted set: `ZADD indexationDelayed {timestamp} {regionId}`
 
-* Add the message id once the event finished:
+* Add the message ID once the event finished:
     * `SET scheduler:indexationFinishedLastId {id} 0`
     * `SET scheduler:indexationCatchupLastId {id} 0`
   
@@ -76,11 +76,11 @@ Add task to a queue with a timestamp. Determine the timestamp by looking at the 
 
 ### How the data is accessed:
 
-* Get the last event id finished by the worker:
+* Get the last event ID finished by the worker:
     * `GET scheduler:indexationFinishedLastId`
     * `GET scheduler:indexationCatchupLastId`
 
-* Listen to 2 stream to determine what kind of schedule it need to do:
+* Listen to 2 stream to determine what kind of schedule it needs to do:
 
 	* When an indexation is finished: `XREAD BLOCK 2 COUNT 1 STREAMS indexationFinished {id}`
 
@@ -109,7 +109,7 @@ Add task to a queue with a timestamp. Determine the timestamp by looking at the 
 
   
 
-Determine if a queued task can be runned or wait until once is ready
+Determine if a queued task can be started or wait until once is ready
 
   
 
@@ -156,7 +156,7 @@ Aggregate and store the data
 
   
 
-	* this data have a ttl bind to them once created: `EXPIRE denormalizedOrders:{locationId}:{typeId} 86400`
+	* these data have a ttl bind to them once created: `EXPIRE denormalizedOrders:{locationId}:{typeId} 86400`
 
   
 
@@ -168,7 +168,7 @@ Aggregate and store the data
 
   
 
-* Listen to a stream to run indexation, id change depending if the worker has restarted or not (it is `O` at start, `$` once the backlog empty):
+* Listen to a stream to run indexation, ID change depending on if the worker has restarted or not (it is `O` at start, `$` once the backlog empty):
 	*  `XREADGROUP GROUP indexationAddGroup {consumer-name} BLOCK 2 COUNT 1 STREAMS indexationAdd {id}`
 
   
@@ -206,16 +206,16 @@ Subscribe to a pub/sub to store access count to a region
 
   
 
-Subscribe to a pub/sub to determine if a catchup is needed
+Subscribe to a pub/sub to determine if a catch-up is needed
 
   
 
 #### How the data is stored:
   
 
-* Send an event to a stream if a catchup is required: `XADD indexationCatchup * regionId {regionId}`
+* Send an event to a stream if a catch-up is required: `XADD indexationCatchup * regionId {regionId}`
 
-* Store the catchup request for 5 minutes: `SET indexationCatchupLaunch:{regionId} 300`
+* Store the catch-up request for 5 minutes: `SET indexationCatchupLaunch:{regionId} 300`
 
   
 
@@ -223,7 +223,7 @@ Subscribe to a pub/sub to determine if a catchup is needed
 
 * Subscribe to event publish: `SUBSCRIBE apiEvent`
 
-* Check if a catchup has been request in the last 5 minutes: `GET indexationCatchupLaunch:{regionId} 300`
+* Check if a catch-up has been request in the last 5 minutes: `GET indexationCatchupLaunch:{regionId} 300`
 
 * Check in the queued task for the next 5 minutes if the regionId is scheduled: `ZRANGEBYSCORE indexationDelayed {now} {now+5minutes}`
 
@@ -257,14 +257,14 @@ Provide aggregated data to end user
 
 ```
 
-FT.SEARCH denormalizedOrdersIdx @locationName:(Dodixie IX Moon 20)|@systemName:(Dodixie IX Moon 20)|@regionName:(Dodixie IX Moon 20) @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000] LIMIT 0 10000
+FT.SEARCH denormalizedOrdersIdx "@locationName:(Dodixie IX Moon 20)|@systemName:(Dodixie IX Moon 20)|@regionName:(Dodixie IX Moon 20) @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000]" LIMIT 0 10000
 
 ```
 
 	eg (with location as id):
 
 ```
-FT.SEARCH denormalizedOrdersIdx @locationIdsTag:{60011866} @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000] LIMIT 0 10000
+FT.SEARCH denormalizedOrdersIdx "@locationIdTags:{60011866} @buyPrice:[5000000.00 10000000] @sellPrice:[6000000 20000000]" LIMIT 0 10000
 ```
 
 ### CLI
@@ -301,28 +301,35 @@ FT.CREATE denormalizedOrdersIx
 ### Prerequisites
 
 * Docker & Docker-composer
-* GO 1.18
 * Internet connection
-* A remote redis server with at least 500MB memory and the following modules: RediSearch, RedisJson, RedisTimeseries
+* GO 1.18 if you cannot use the cli provided in the release
   
 
 ### Local installation
 
-* Change `.env.dist` to `.env` and modify value inside
+#### 1. With redis from docker-compose
+* Change `.env.docker.dist` to `.env.docker.local` (modify value inside if you plan to change the password, make sure to do it also in the docker-compose redis service)
+* Change `.env.dist` to `.env.local` (change password if you changed it in the step before)
+* Run `docker-compose up` 
 * Use one of the executable in the release [link to release] and run the following commands:
-    * `wall-eve-cli-{youros} install --envFile=$pathToYourEnvFile`
-* Run `docker-compose up`
-* Run `wall-eve-cli warmup 10000032 --envFile=$pathToYourEnvFile`
+	* Run `wall-eve-cli-{youros} install --envFile=.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=.env.local`
 
-The process will now start and pull the data
+#### 2. With redis from not docker-compose
+* Change `.env.dist` to `.env.local` and change the value using your own redis address (don't forget to add the port at the end of the address `{adress}:{port}`)
+* Run `docker-compose -f docker-compose-noredis.yaml up` 
+* Use one of the executable in the release [link to release] and run the following commands:
+	* Run `wall-eve-cli-{youros} install --envFile=.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=.env.local`
+	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=.env.local`
 
 **If you cannot run one of the binary, you can follow the following step (it requires go 1.18 installed)s**
-* Change `.env.dist` to `.env` and modify value inside
 * `cd backend`
 * `go mod download`
-* `go run cmd/cli/main.go install --env=$pathToYourEnvFile`
-* `cd .. & docker-compose up`
-* `cd backend && go run cmd/cli/main.go warmup 10000032 --env=$pathToYourEnvFile`
+* `go run cmd/cli/main.go install --env=.env.local`
+* `cd backend && go run cmd/cli/main.go warmup 10000032 --env=.env.local`
+* `cd backend && go run cmd/cli/main.go warmup 10000002 --env=.env.local`
 
 It can take 2-3 minutes before the first entries are saved into the application
 

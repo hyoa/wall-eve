@@ -10,8 +10,6 @@ services:
     restart: on-failure
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
   
   heartbeat:
     container_name: heartbeat
@@ -23,8 +21,6 @@ services:
     restart: always
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
   
   delayer:
     container_name: delayer
@@ -36,8 +32,6 @@ services:
     restart: always
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
 
   scheduler:
     container_name: scheduler
@@ -49,8 +43,6 @@ services:
     restart: always
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
   
   refresh:
     container_name: refresh
@@ -62,8 +54,6 @@ services:
     restart: always
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
 
   indexer-1:
     container_name: indexer-1
@@ -76,8 +66,6 @@ services:
     restart: always
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
     
   indexer-2:
     container_name: indexer-2
@@ -90,8 +78,6 @@ services:
     restart: always
     env_file:
       - .env.docker.local
-    depends_on:
-      - redis
   
   swagger-ui:
     image: swaggerapi/swagger-ui
@@ -101,22 +87,4 @@ services:
       - ./swagger/wall-eve.yaml:/swagger/wall-eve.yaml
     environment:
       SWAGGER_JSON: /swagger/wall-eve.yaml
-  
-  redis:
-    image: "redislabs/redismod"
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis:/data
-    restart: always
-    entrypoint: >
-      redis-server
-        --requirepass asuperstrongpassword
-        --loadmodule /usr/lib/redis/modules/redisearch.so
-        --loadmodule /usr/lib/redis/modules/redistimeseries.so
-        --loadmodule /usr/lib/redis/modules/rejson.so
-        --appendonly yes
-
-volumes:
-  redis:
-    driver: local
+      
