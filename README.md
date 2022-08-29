@@ -322,14 +322,14 @@ FT.CREATE denormalizedOrdersIx
 	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=$path/.env.local`
 
 **If you cannot run one of the binary, you can follow one of the 2 options below**
-#####1. With go 1.18 installed
+###### 1. With go 1.18 installed
 	* `cd backend`
 	* `go mod download`
 	* `go run cmd/cli/main.go install --env=$path/.env.local`
 	* `cd backend && go run cmd/cli/main.go warmup 10000032 --env=$path/.env.local`
 	* `cd backend && go run cmd/cli/main.go warmup 10000002 --env=$path/.env.local`
 
-######2. Without go but an access to the redis cli
+###### 2. Without go but an access to the redis cli
 Run the following commands:
 
 ```
