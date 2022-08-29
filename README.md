@@ -18,7 +18,7 @@ The application will refresh the data regurarly to provide up-to-data informatio
   
   
 
-![A schema of the application](dist/archi.png.jpg?raw=true "Application")
+![A schema of the application](dist/archi.png?raw=true "Application")
 
   
 
