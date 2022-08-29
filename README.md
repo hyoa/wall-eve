@@ -27,14 +27,9 @@ The application will refresh the data regurarly to provide up-to-data informatio
   
 
 Here's a short video that explains the project and how it uses Redis:
-
   
 
-[Insert your own video here, and remove the one below]
-
-  
-
-[!Presentation](https://youtu.be/TuLA9CL8OsM)
+[![Youtube presentation](https://img.youtube.com/vi/TuLA9CL8OsM/hqdefault.jpg)](https://youtu.be/TuLA9CL8OsM)
 
   
 
