@@ -295,7 +295,7 @@ FT.CREATE denormalizedOrdersIdx
 
 * Docker & Docker-composer
 * Internet connection
-* GO 1.18 (in case you cannot run one of the binary file)
+* GO 1.18 (if you cannot access the redis cli)
 * Not doing it between 11:00UTC and 11:30UTC (there is a maintenance on the game that shutdown their API)
 
 ### Local installation
@@ -304,20 +304,11 @@ FT.CREATE denormalizedOrdersIdx
 * Change `.env.docker.dist` to `.env.docker.local` (modify value inside if you plan to change the password, make sure to do it also in the docker-compose redis service)
 * Change `.env.dist` to `.env.local` (change password if you changed it in the step before)
 * Run `docker-compose up` 
-* Use one of the executable in the release [link to release] and run the following commands:
-	* Run `wall-eve-cli-{youros} install --envFile=$path/.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=$path/.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=$path/.env.local`
 
 #### 2. With redis from not docker-compose (you need a least 500mb of memory)
 * Change `.env.dist` to `.env.local` and change the value using your own redis address (don't forget to add the port at the end of the address `{adress}:{port}`)
 * Run `docker-compose -f docker-compose-no-redis.yaml up` 
-* Use one of the executable in the release [link to release] and run the following commands:
-	* Run `wall-eve-cli-{youros} install --envFile=$path/.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000032 --envFile=$path/.env.local`
-	* Run `wall-eve-cli-{youros} warmup 10000002 --envFile=$path/.env.local`
 
-**If you cannot run one of the binary, you can follow one of the 2 options below**
 ###### 1. With go 1.18 installed
 	* `cd backend`
 	* `go mod download`
