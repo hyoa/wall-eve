@@ -20,16 +20,7 @@ The application will refresh the data regurarly to provide up-to-data informatio
 
 ![A schema of the application](dist/archi.png?raw=true "Application")
 
-  
-
-# Overview video (Optional)
-
-  
-
-Here's a short video that explains the project and how it uses Redis:
-  
-
-[![Youtube presentation](https://img.youtube.com/vi/TuLA9CL8OsM/hqdefault.jpg)](https://youtu.be/TuLA9CL8OsM)
+ 
 
   
 
